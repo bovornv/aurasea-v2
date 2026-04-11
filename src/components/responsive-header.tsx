@@ -1,15 +1,26 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { useUser } from '@/providers/user-context'
+import { createClient } from '@/lib/supabase/client'
 import { BranchSwitcher } from './branch-switcher'
 import { MobileDrawer } from './mobile-drawer'
 import { LocaleSwitcher } from './locale-switcher'
+import { LogOut } from 'lucide-react'
 
 export function ResponsiveHeader() {
   const { organization } = useUser()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <>
@@ -66,21 +77,21 @@ export function ResponsiveHeader() {
           <LocaleSwitcher />
         </div>
 
-        {/* User avatar */}
-        <div
-          className="hidden md:flex items-center justify-center"
+        {/* Logout button — always visible */}
+        <button
+          onClick={handleLogout}
+          className="touch-target flex items-center justify-center"
           style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            background: 'var(--color-accent-light)',
-            color: 'var(--color-accent-text)',
-            fontSize: 'var(--font-size-xs)',
-            fontWeight: 'var(--font-weight-medium)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            color: 'var(--color-text-tertiary)',
+            padding: 4,
           }}
+          title="ออกจากระบบ"
         >
-          {organization?.name?.charAt(0) || 'A'}
-        </div>
+          <LogOut size={18} />
+        </button>
       </header>
 
       {/* Mobile branch pills below topbar */}

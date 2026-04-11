@@ -56,7 +56,7 @@ export async function getUserContext(
   } else if (branchMemberships.length > 0) {
     // Branch-only member
     const firstBranch = branchMemberships[0]
-    if (firstBranch.role === 'branch_manager') {
+    if (firstBranch.role === 'branch_manager' || firstBranch.role === 'manager') {
       role = 'manager'
     } else {
       role = 'staff'

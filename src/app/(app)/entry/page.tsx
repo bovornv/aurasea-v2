@@ -85,9 +85,21 @@ export default function EntryPage() {
     const existingId = isHotel ? existingAccom?.id : existingFnb?.id
 
     if (existingId) {
-      await db.from(table).update(entry).eq('id', existingId)
+      const { error: updateErr } = await db.from(table).update(entry).eq('id', existingId)
+      if (updateErr) {
+        console.error('Entry update failed:', updateErr.message, updateErr.details)
+        alert(`บันทึกไม่สำเร็จ: ${updateErr.message}`)
+        setSaving(false)
+        return
+      }
     } else {
-      await db.from(table).insert(entry)
+      const { error: insertErr } = await db.from(table).insert(entry)
+      if (insertErr) {
+        console.error('Entry insert failed:', insertErr.message, insertErr.details)
+        alert(`บันทึกไม่สำเร็จ: ${insertErr.message}`)
+        setSaving(false)
+        return
+      }
     }
 
     if (organization) {

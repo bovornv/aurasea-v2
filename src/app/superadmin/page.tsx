@@ -35,12 +35,21 @@ export default function SuperadminDashboard() {
     load()
   }, [supabase])
 
-  async function changePlan(orgId: string, newPlan: string) {
+  const [pendingChange, setPendingChange] = useState<{ orgId: string; orgName: string; fromPlan: string; toPlan: string } | null>(null)
+
+  function requestPlanChange(orgId: string, orgName: string, fromPlan: string, toPlan: string) {
+    if (fromPlan === toPlan) return
+    setPendingChange({ orgId, orgName, fromPlan, toPlan })
+  }
+
+  async function confirmPlanChange() {
+    if (!pendingChange) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabase as any
-    await db.from('organizations').update({ plan: newPlan }).eq('id', orgId)
-    await db.from('audit_log').insert({ action: 'change_plan', target_entity: 'organizations', target_id: orgId, payload: { plan: newPlan } })
-    setOrgs((prev) => prev.map((o) => o.id === orgId ? { ...o, plan: newPlan } : o))
+    await db.from('organizations').update({ plan: pendingChange.toPlan }).eq('id', pendingChange.orgId)
+    await db.from('audit_log').insert({ action: 'change_plan', target_entity: 'organizations', target_id: pendingChange.orgId, payload: { from: pendingChange.fromPlan, to: pendingChange.toPlan } })
+    setOrgs((prev) => prev.map((o) => o.id === pendingChange.orgId ? { ...o, plan: pendingChange.toPlan } : o))
+    setPendingChange(null)
   }
 
   if (loading) return <div style={{ padding: 40, color: 'var(--color-text-tertiary)' }}>Loading...</div>
@@ -74,7 +83,7 @@ export default function SuperadminDashboard() {
                 <td style={td}>
                   <select
                     value={org.plan}
-                    onChange={(e) => changePlan(org.id, e.target.value)}
+                    onChange={(e) => requestPlanChange(org.id, org.name, org.plan, e.target.value)}
                     style={{ fontSize: 12, padding: '2px 8px', border: '1px solid var(--color-border-strong)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg)' }}
                   >
                     <option value="starter">Starter</option>
@@ -93,6 +102,24 @@ export default function SuperadminDashboard() {
           </tbody>
         </table>
       </div>
+
+      {/* Plan change confirmation dialog */}
+      {pendingChange && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)', padding: 24, maxWidth: 400, width: '90%' }}>
+            <h3 style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 8 }}>ยืนยันเปลี่ยนแพลน</h3>
+            <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
+              เปลี่ยน <strong>{pendingChange.orgName}</strong> จาก{' '}
+              <span style={{ fontWeight: 500 }}>{pendingChange.fromPlan}</span> เป็น{' '}
+              <span style={{ fontWeight: 500, color: 'var(--color-accent)' }}>{pendingChange.toPlan}</span>?
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setPendingChange(null)} style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', border: '1px solid var(--color-border-strong)', borderRadius: 'var(--radius-md)', background: 'transparent', color: 'var(--color-text-secondary)', cursor: 'pointer' }}>ยกเลิก</button>
+              <button onClick={confirmPlanChange} style={{ fontSize: 13, fontWeight: 500, padding: '7px 16px', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-accent)', color: 'white', cursor: 'pointer' }}>ยืนยัน</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

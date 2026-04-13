@@ -60,7 +60,7 @@ export default function EntryPage() {
     const db = supabase as any
     const [entryResult, targetResult] = await Promise.all([
       db.from(table).select('*').eq('branch_id', activeBranch.id).eq('metric_date', date).maybeSingle(),
-      db.from('targets').select('*').eq('branch_id', activeBranch.id).maybeSingle(),
+      db.from('targets').select('adr_target, occupancy_target, occ_target, covers_target, cogs_target, avg_spend_target, labour_target, operating_days').eq('branch_id', activeBranch.id).maybeSingle(),
     ])
 
     if (isHotel) {

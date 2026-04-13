@@ -16,10 +16,10 @@ interface NotificationPayload {
 
 // Daily email caps per role
 const EMAIL_CAPS: Record<string, number> = {
-  owner: 4,     // flash + 2 alerts + reminder
+  owner: 20,    // TESTING — change back to 4 before launch
   manager: 1,   // reminder only
   staff: 0,     // never
-  superadmin: 10,
+  superadmin: 20,
 }
 
 export async function sendNotification(payload: NotificationPayload) {
@@ -45,8 +45,8 @@ export async function sendNotification(payload: NotificationPayload) {
   const dailyCap = EMAIL_CAPS[userRole] ?? 0
 
   // Get email from auth.users via service role
-  const { data: { users } } = await supabase.auth.admin.listUsers()
-  const userEmail = users?.find((u) => u.id === payload.userId)?.email
+  const { data: { user: authUser } } = await supabase.auth.admin.getUserById(payload.userId)
+  const userEmail = authUser?.email
 
   const promises: Promise<unknown>[] = []
 

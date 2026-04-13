@@ -110,18 +110,22 @@ export async function POST(req: NextRequest) {
         recommendation,
       })
 
-      await sendNotification({
-        userId: setting.user_id,
-        organizationId: setting.organization_id,
-        branchId: branch.id,
-        type: 'morning_flash',
-        emailSubject: `สรุปเช้า: ${branch.name} — ${dateStr}`,
-        emailReact: <MorningFlash {...emailProps} />,
-        lineMessage: lineMsg,
-        metricDate: today,
-      })
-
-      results.push({ userId: setting.user_id, status: 'sent' })
+      try {
+        await sendNotification({
+          userId: setting.user_id,
+          organizationId: setting.organization_id,
+          branchId: branch.id,
+          type: 'morning_flash',
+          emailSubject: `สรุปเช้า: ${branch.name} — ${dateStr}`,
+          emailReact: <MorningFlash {...emailProps} />,
+          lineMessage: lineMsg,
+          metricDate: today,
+        })
+        results.push({ userId: setting.user_id, status: 'sent' })
+      } catch (err) {
+        console.error('sendNotification failed:', err)
+        results.push({ userId: setting.user_id, status: 'error', error: (err as Error).message } as typeof results[0])
+      }
     }
   }
 

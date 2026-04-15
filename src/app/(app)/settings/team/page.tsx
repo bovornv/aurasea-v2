@@ -18,10 +18,12 @@ interface Member {
   branch_name?: string
 }
 
+import { SEAT_LIMITS } from '@/lib/config/pricing'
+
 const seatLimits: Record<string, { manager: number; staff: number }> = {
-  starter: { manager: 1, staff: 2 },
-  growth: { manager: 2, staff: 5 },
-  pro: { manager: 999, staff: 999 },
+  starter: { manager: SEAT_LIMITS.starter.managers, staff: SEAT_LIMITS.starter.staff },
+  growth: { manager: SEAT_LIMITS.growth.managers, staff: SEAT_LIMITS.growth.staff },
+  pro: { manager: SEAT_LIMITS.pro.managers === Infinity ? 999 : SEAT_LIMITS.pro.managers, staff: SEAT_LIMITS.pro.staff === Infinity ? 999 : SEAT_LIMITS.pro.staff },
 }
 
 export default function TeamPage() {

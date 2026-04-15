@@ -77,6 +77,15 @@ export default function OnboardingBranch() {
         <Button variant="primary" fullWidth disabled={!branchName.trim() || saving} onClick={handleNext}>
           {saving ? 'กำลังบันทึก...' : 'ต่อไป →'}
         </Button>
+
+        <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', textAlign: 'center' }}>
+          <p style={{ fontSize: 12, color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
+            ทดลองใช้ฟรี 14 วัน ไม่ต้องใส่บัตรเครดิต
+          </p>
+          <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+            หลังจากนั้นติดต่อทีมเพื่อเปิดใช้งาน
+          </p>
+        </div>
       </div>
     </div>
   )

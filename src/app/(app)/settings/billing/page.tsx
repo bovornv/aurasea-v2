@@ -4,26 +4,39 @@ import { useTranslations } from 'next-intl'
 import { useUser } from '@/providers/user-context'
 import { formatDate } from '@/lib/format'
 import { Button } from '@/components/ui/Button'
-import { ArrowLeft, Crown } from 'lucide-react'
+import { ArrowLeft, Crown, Check } from 'lucide-react'
 import Link from 'next/link'
+import { PRICING, SEAT_LIMITS, formatPrice } from '@/lib/config/pricing'
+import type { Plan, BranchType } from '@/lib/config/pricing'
 
-const planDetails = {
-  starter: { price: '฿490', features: ['1 branch', '1 manager', '2 staff', '1 rec/day'] },
-  growth: { price: '฿990', features: ['2 branches', '2 managers', '5 staff', '3 recs/day', 'Labour alerts'] },
-  pro: { price: '฿2,490', features: ['3 branches', 'Unlimited team', 'Unlimited recs', 'Weekly PDF', 'Portfolio'] },
+const accommodationFeatures: Record<Plan, string[]> = {
+  starter: ['1 สาขา', '1 manager · 2 staff', '1 คำแนะนำ/วัน', 'Dashboard หลัก', 'Morning flash email'],
+  growth: ['2 สาขา', '2 managers · 5 staff', '3 คำแนะนำ/วัน', 'Trends tab', 'Pricing scenarios', 'Channel breakdown', 'Labour alert'],
+  pro: ['3 สาขา', 'ทีมไม่จำกัด', 'คำแนะนำไม่จำกัด', 'Labour cost tab', 'Channel mix & OTA commission', 'Demand calendar', 'Portfolio tab', 'Weekly PDF report'],
+}
+
+const fnbFeatures: Record<Plan, string[]> = {
+  starter: ['1 สาขา', '1 manager · 2 staff', '1 คำแนะนำ/วัน', 'Dashboard หลัก', 'Closing summary email'],
+  growth: ['2 สาขา', '2 managers · 5 staff', '3 คำแนะนำ/วัน', 'Trends tab', 'Cost tab', 'Food/non-food split', 'COGS & Labour alert'],
+  pro: ['3 สาขา', 'ทีมไม่จำกัด', 'คำแนะนำไม่จำกัด', 'Labour cost tab', 'Monthly P&L', 'Portfolio tab', 'Weekly PDF report'],
 }
 
 export default function BillingPage() {
-  const { organization, branches, plan } = useUser()
+  const { organization, branches, plan, activeBranch } = useUser()
   const t = useTranslations('settingsBilling')
 
   if (!organization) return null
 
-  const details = planDetails[plan]
-  const planBranchLimits = { starter: 1, growth: 2, pro: 3 }
+  const bt: BranchType = activeBranch?.business_type === 'fnb' ? 'fnb' : 'accommodation'
+  const pricing = PRICING[bt]
+  const features = bt === 'fnb' ? fnbFeatures : accommodationFeatures
+
+  const planBranchLimits = { starter: SEAT_LIMITS.starter.branches, growth: SEAT_LIMITS.growth.branches, pro: SEAT_LIMITS.pro.branches }
   const trialDaysLeft = organization.plan_expires_at
     ? Math.max(0, Math.ceil((new Date(organization.plan_expires_at).getTime() - Date.now()) / 86400000))
     : null
+
+  const plans: Plan[] = ['starter', 'growth', 'pro']
 
   return (
     <div className="space-y-4">
@@ -35,7 +48,7 @@ export default function BillingPage() {
       </div>
       <h2 className="text-lg font-medium text-slate-900 leading-heading hidden lg:block">{t('title')}</h2>
 
-      {/* Current plan */}
+      {/* Current plan status */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -58,7 +71,7 @@ export default function BillingPage() {
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-slate-500">{t('price')}</span>
-            <span className="font-medium">{details.price}/{t('month')}</span>
+            <span className="font-medium">{formatPrice(pricing[plan].monthly)}/{t('month')}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">{t('branches')}</span>
@@ -71,15 +84,64 @@ export default function BillingPage() {
             </div>
           )}
         </div>
+      </div>
 
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <p className="text-xs text-slate-500 mb-1">{t('includes')}</p>
-          <ul className="space-y-0.5">
-            {details.features.map((f, i) => (
-              <li key={i} style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}><span style={{ color: 'var(--color-positive)' }}>✓</span> {f}</li>
-            ))}
-          </ul>
-        </div>
+      {/* Plan comparison cards */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {plans.map((p) => {
+          const isCurrent = plan === p
+          const isPopular = p === 'growth'
+          return (
+            <div
+              key={p}
+              style={{
+                background: 'var(--color-bg)',
+                border: isCurrent ? '2px solid var(--color-accent)' : '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                padding: 16,
+                position: 'relative',
+              }}
+            >
+              {isPopular && (
+                <span style={{ position: 'absolute', top: -10, right: 12, fontSize: 10, fontWeight: 600, padding: '2px 10px', borderRadius: 'var(--radius-pill)', background: 'var(--color-accent)', color: 'white' }}>
+                  Most popular
+                </span>
+              )}
+              <div className="flex items-center justify-between" style={{ marginBottom: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </span>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                    {formatPrice(pricing[p].monthly)}
+                  </span>
+                  <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>/เดือน</span>
+                </div>
+              </div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 10 }}>
+                ชำระรายปี ประหยัด 2 เดือน · {formatPrice(pricing[p].annual)}/ปี
+              </p>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {features[p].map((f, i) => (
+                  <li key={i} className="flex items-start gap-1.5" style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 3 }}>
+                    <Check size={12} style={{ color: 'var(--color-positive)', marginTop: 2, flexShrink: 0 }} />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              {isCurrent && (
+                <p style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-accent)', marginTop: 8 }}>แพลนปัจจุบัน</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Mixed portfolio note */}
+      <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
+        <p style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          มีทั้งโรงแรมและร้านอาหาร? <strong>Pro Mixed {formatPrice(PRICING.mixed.pro.monthly)}/เดือน</strong> · รวมทุกฟีเจอร์สำหรับทั้งสองประเภท
+        </p>
       </div>
 
       {/* Upgrade CTA */}
@@ -87,9 +149,15 @@ export default function BillingPage() {
         <div style={{ background: 'var(--color-accent-light)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
           <h3 style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4 }}>{t('upgradeTitle')}</h3>
           <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginBottom: 12 }}>{t('upgradeDescription')}</p>
-          <a href="mailto:hello@auraseaos.com?subject=Upgrade%20Plan" style={{ textDecoration: 'none' }}>
-            <Button variant="primary" size="sm">{t('contactTeam')}</Button>
+          <a
+            href={`mailto:hello@auraseaos.com?subject=${encodeURIComponent(`อัปเกรดแพลน ${plan === 'starter' ? 'Growth' : 'Pro'} — ${organization.name}`)}`}
+            style={{ textDecoration: 'none' }}
+          >
+            <Button variant="primary" size="sm">ติดต่อทีม Aurasea</Button>
           </a>
+          <p style={{ fontSize: 10, color: 'var(--color-text-tertiary)', marginTop: 8 }}>
+            ชำระผ่าน PromptPay · ยืนยันภายใน 24 ชม.
+          </p>
         </div>
       )}
     </div>

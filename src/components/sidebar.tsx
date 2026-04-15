@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { LocaleSwitcher } from './locale-switcher'
 import type { AppRole } from '@/lib/supabase/types'
+import { PLAN_LEVEL, PRICING, formatPrice } from '@/lib/config/pricing'
+import type { BranchType } from '@/lib/config/pricing'
 
 interface NavItem {
   href: string
@@ -18,21 +20,27 @@ interface NavItem {
   plans?: ('starter' | 'growth' | 'pro')[]
   branchTypes?: string[]
   locked?: boolean
+  requiredPlan?: 'growth' | 'pro'
 }
 
-function getNavItems(role: AppRole, plan: string, branchType: string): (NavItem & { isLocked: boolean })[] {
+function getLockedTitle(requiredPlan: 'growth' | 'pro', bt: BranchType): string {
+  const price = PRICING[bt][requiredPlan].monthly
+  const label = requiredPlan === 'growth' ? 'Growth' : 'Pro'
+  return `${label} ${formatPrice(price)}/เดือน`
+}
+
+function getNavItems(role: AppRole, plan: string, branchType: string): (NavItem & { isLocked: boolean; lockedTitle?: string })[] {
+  const bt: BranchType = branchType === 'fnb' ? 'fnb' : 'accommodation'
   const allItems: NavItem[] = [
     { href: '/home', icon: Home, labelKey: 'home', roles: ['owner', 'manager', 'staff', 'superadmin'] },
     { href: '/entry', icon: PenLine, labelKey: 'entry', roles: ['owner', 'manager', 'staff', 'superadmin'] },
-    { href: '/trends', icon: TrendingUp, labelKey: 'trends', roles: ['owner', 'manager', 'superadmin'] },
-    { href: '/pricing', icon: DollarSign, labelKey: 'pricing', roles: ['owner', 'superadmin'], plans: ['growth', 'pro'], branchTypes: ['accommodation'] },
-    { href: '/cost', icon: PieChart, labelKey: 'cost', roles: ['owner', 'superadmin'], plans: ['growth', 'pro'], branchTypes: ['fnb'] },
-    { href: '/labour', icon: Briefcase, labelKey: 'labour', roles: ['owner', 'superadmin'], plans: ['pro'] },
-    { href: '/portfolio', icon: BarChart3, labelKey: 'portfolio', roles: ['owner', 'superadmin'], plans: ['pro'] },
+    { href: '/trends', icon: TrendingUp, labelKey: 'trends', roles: ['owner', 'manager', 'superadmin'], plans: ['growth', 'pro'], requiredPlan: 'growth' },
+    { href: '/pricing', icon: DollarSign, labelKey: 'pricing', roles: ['owner', 'superadmin'], plans: ['growth', 'pro'], branchTypes: ['accommodation'], requiredPlan: 'growth' },
+    { href: '/cost', icon: PieChart, labelKey: 'cost', roles: ['owner', 'superadmin'], plans: ['growth', 'pro'], branchTypes: ['fnb'], requiredPlan: 'growth' },
+    { href: '/labour', icon: Briefcase, labelKey: 'labour', roles: ['owner', 'superadmin'], plans: ['pro'], requiredPlan: 'pro' },
+    { href: '/portfolio', icon: BarChart3, labelKey: 'portfolio', roles: ['owner', 'superadmin'], plans: ['pro'], requiredPlan: 'pro' },
     { href: '/settings', icon: Settings, labelKey: 'settings', roles: ['owner', 'superadmin'] },
   ]
-
-  const planLevel: Record<string, number> = { starter: 0, growth: 1, pro: 2 }
 
   return allItems
     .filter((item) => {
@@ -40,10 +48,14 @@ function getNavItems(role: AppRole, plan: string, branchType: string): (NavItem 
       if (item.branchTypes && !item.branchTypes.includes(branchType)) return false
       return true
     })
-    .map((item) => ({
-      ...item,
-      isLocked: item.plans ? !item.plans.some((p) => planLevel[plan] >= planLevel[p]) : false,
-    }))
+    .map((item) => {
+      const isLocked = item.plans ? !item.plans.some((p) => PLAN_LEVEL[plan as keyof typeof PLAN_LEVEL] >= PLAN_LEVEL[p]) : false
+      return {
+        ...item,
+        isLocked,
+        lockedTitle: isLocked && item.requiredPlan ? getLockedTitle(item.requiredPlan, bt) : undefined,
+      }
+    })
 }
 
 export function Sidebar() {
@@ -112,7 +124,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.isLocked ? '/settings/billing' : item.href}
-              title={t(item.labelKey)}
+              title={item.isLocked && item.lockedTitle ? item.lockedTitle : t(item.labelKey)}
               className="relative flex items-center touch-target sidebar-nav-item"
               style={{
                 padding: '8px 14px',

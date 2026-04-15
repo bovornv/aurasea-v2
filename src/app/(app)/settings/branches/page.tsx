@@ -8,8 +8,9 @@ import { BranchTypeBadge } from '@/components/ui/BranchTypeBadge'
 import { Button } from '@/components/ui/Button'
 import { ArrowLeft, Pencil, Plus } from 'lucide-react'
 import Link from 'next/link'
+import { SEAT_LIMITS } from '@/lib/config/pricing'
 
-const planBranchLimits = { starter: 1, growth: 2, pro: 3 }
+const planBranchLimits = { starter: SEAT_LIMITS.starter.branches, growth: SEAT_LIMITS.growth.branches, pro: SEAT_LIMITS.pro.branches }
 
 export default function BranchesPage() {
   const { branches, plan, role } = useUser()

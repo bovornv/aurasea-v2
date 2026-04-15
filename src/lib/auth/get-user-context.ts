@@ -80,6 +80,15 @@ export async function getUserContext(
     }
   }
 
+  // Trial override: during active trial, grant Pro access regardless of selected plan
+  if (organization?.is_trial && organization.trial_started_at) {
+    const trialEnd = new Date(organization.trial_started_at)
+    trialEnd.setDate(trialEnd.getDate() + 14)
+    if (new Date() < trialEnd) {
+      plan = 'pro'
+    }
+  }
+
   // Get all accessible branches
   let branches: Branch[] = []
   if (organization) {

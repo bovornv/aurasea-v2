@@ -9,6 +9,8 @@ export type Database = {
           plan: 'starter' | 'growth' | 'pro'
           plan_expires_at: string | null
           plan_activated_at: string | null
+          is_trial: boolean
+          trial_started_at: string | null
           created_at: string
         }
         Insert: {
@@ -18,6 +20,8 @@ export type Database = {
           plan?: 'starter' | 'growth' | 'pro'
           plan_expires_at?: string | null
           plan_activated_at?: string | null
+          is_trial?: boolean
+          trial_started_at?: string | null
         }
         Update: Record<string, unknown>
       }

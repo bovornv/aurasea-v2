@@ -4,22 +4,42 @@ import { useTranslations } from 'next-intl'
 import { Lock } from 'lucide-react'
 import { useUser } from '@/providers/user-context'
 import Link from 'next/link'
+import { PLAN_LEVEL, PRICING, formatPrice } from '@/lib/config/pricing'
+import type { BranchType } from '@/lib/config/pricing'
 
 interface PlanGateProps {
   requiredPlan: 'growth' | 'pro'
   featureName: string
   children: React.ReactNode
+  branchType?: BranchType
 }
 
-const planLevel = { starter: 0, growth: 1, pro: 2 }
-
-export function PlanGate({ requiredPlan, featureName, children }: PlanGateProps) {
-  const { plan } = useUser()
+export function PlanGate({ requiredPlan, featureName, children, branchType }: PlanGateProps) {
+  const { plan, activeBranch } = useUser()
   const t = useTranslations('planGate')
 
-  if (planLevel[plan] >= planLevel[requiredPlan]) {
+  if (PLAN_LEVEL[plan] >= PLAN_LEVEL[requiredPlan]) {
     return <>{children}</>
   }
+
+  const bt: BranchType = branchType || (activeBranch?.business_type === 'fnb' ? 'fnb' : 'accommodation')
+
+  // Build upgrade text based on current plan and required plan
+  let upgradeLabel: string
+  if (requiredPlan === 'growth') {
+    const price = PRICING[bt].growth.monthly
+    upgradeLabel = `อัปเกรด Growth — ${formatPrice(price)}/เดือน`
+  } else if (plan === 'starter') {
+    // Starter user seeing Pro feature — show stepping stone
+    const growthPrice = PRICING[bt].growth.monthly
+    const proPrice = PRICING[bt].pro.monthly
+    upgradeLabel = `เริ่มที่ Growth ${formatPrice(growthPrice)}/เดือน หรือ Pro ${formatPrice(proPrice)}/เดือน`
+  } else {
+    const price = PRICING[bt].pro.monthly
+    upgradeLabel = `อัปเกรด Pro — ${formatPrice(price)}/เดือน`
+  }
+
+  const buttonLabel = requiredPlan === 'growth' ? 'ดูแพลน Growth →' : 'ดูแพลน Pro →'
 
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 opacity-75">
@@ -30,14 +50,14 @@ export function PlanGate({ requiredPlan, featureName, children }: PlanGateProps)
           {requiredPlan}+
         </span>
       </div>
-      <p className="text-xs text-slate-400 mb-3 leading-body">
-        {t('description')}
+      <p className="text-xs text-slate-500 mb-3 leading-body">
+        {upgradeLabel}
       </p>
       <Link
         href="/settings/billing"
         className="text-xs text-blue-600 hover:text-blue-700 font-medium"
       >
-        {t('upgrade')}
+        {buttonLabel}
       </Link>
     </div>
   )

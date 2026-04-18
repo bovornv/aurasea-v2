@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendNotification } from '@/lib/notifications/send'
 import LabourAlert from '@/lib/email/templates/labourAlert'
+import { getTodayBangkok } from '@/lib/businessDate'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayBangkok()
 
   const { data: branch } = await supabase.from('branches').select('name, business_type').eq('id', branchId).single()
   if (!branch) return NextResponse.json({ error: 'Branch not found' }, { status: 404 })

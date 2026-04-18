@@ -17,7 +17,7 @@ import {
   fnbToUnified,
   type UnifiedMetric,
 } from '@/lib/supabase/entry-tables'
-import { getTodayBangkok } from '@/lib/businessDate'
+import { getTodayBangkok, toBangkokDateStr } from '@/lib/businessDate'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -96,7 +96,7 @@ export function HomeDashboard() {
 
   // Staff view — minimal, calm
   if (role === 'staff') {
-    const todayEntered = metrics.some((m) => m.metric_date?.substring(0, 10) === getTodayBangkok())
+    const todayEntered = metrics.some((m) => toBangkokDateStr(m.metric_date) === getTodayBangkok())
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         {todayEntered ? (

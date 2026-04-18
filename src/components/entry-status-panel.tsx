@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { formatWeekday } from '@/lib/format'
-import { getTodayBangkok } from '@/lib/businessDate'
+import { getTodayBangkok, toBangkokDateStr } from '@/lib/businessDate'
 
 interface EntryStatusPanelProps {
   metrics: { metric_date: string }[]
@@ -30,7 +30,7 @@ export function EntryStatusPanel({ metrics }: EntryStatusPanelProps) {
     days.push({
       date: dateStr,
       label: formatWeekday(dateStr),
-      hasEntry: metrics.some((m) => m.metric_date?.substring(0, 10) === dateStr),
+      hasEntry: metrics.some((m) => toBangkokDateStr(m.metric_date) === dateStr),
     })
   }
 

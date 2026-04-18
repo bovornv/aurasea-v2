@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatPercent } from '@/lib/format'
 import { getEntryTable } from '@/lib/supabase/entry-tables'
 import { Check } from 'lucide-react'
-import { getTodayBangkok } from '@/lib/businessDate'
+import { getTodayBangkok, toBangkokDateStr } from '@/lib/businessDate'
 import Link from 'next/link'
 
 interface Props {
@@ -49,7 +49,7 @@ export function EntryConfirmation({ businessDateLabel, businessDateStr, isHotel,
       .in('metric_date', days)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then(({ data }: { data: any[] | null }) => {
-        const dates = (data || []).map((d: { metric_date: string }) => d.metric_date?.substring(0, 10))
+        const dates = (data || []).map((d: { metric_date: string }) => toBangkokDateStr(d.metric_date))
         setStreakDays(days.map((d) => dates.includes(d)))
       })
   }, [activeBranch, supabase])

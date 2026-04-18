@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { sendNotification } from '@/lib/notifications/send'
 import MorningFlash from '@/lib/email/templates/morningFlash'
 import { buildMorningFlashLine } from '@/lib/line/messaging'
+import { getTodayBangkok } from '@/lib/businessDate'
 
 export async function POST(req: NextRequest) {
   // Verify cron secret or entry form trigger
@@ -14,7 +15,7 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const today = new Date().toISOString().split('T')[0]
+  const today = getTodayBangkok()
 
   // If triggered from entry form, send for specific org
   let body: { branchId?: string; organizationId?: string } = {}

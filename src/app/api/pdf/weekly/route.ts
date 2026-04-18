@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { toBangkokDateStr } from '@/lib/businessDate'
 
 export async function GET(req: NextRequest) {
   const branchId = req.nextUrl.searchParams.get('branchId')
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     .from('branch_daily_metrics')
     .select('metric_date, revenue, adr, occupancy_rate, revpar, customers, avg_ticket, margin')
     .eq('branch_id', branchId)
-    .gte('metric_date', startDate.toISOString().split('T')[0])
+    .gte('metric_date', toBangkokDateStr(startDate.toISOString()))
     .order('metric_date', { ascending: true })
 
   if (!branch || !metrics?.length) {
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
   )
 
   const csv = [headers.join(','), ...rows.map((r: unknown[]) => r.join(','))].join('\n')
-  const weekStr = startDate.toISOString().split('T')[0]
+  const weekStr = toBangkokDateStr(startDate.toISOString())
 
   return new Response('\ufeff' + csv, {
     headers: {

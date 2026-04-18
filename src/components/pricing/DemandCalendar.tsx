@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import type { BranchDailyMetric } from '@/hooks/useBranchMetrics'
+import { toBangkokDateStr } from '@/lib/businessDate'
 
 // Thai holidays 2026 (future dates from April)
 const thaiHolidays2026 = ['2026-05-01', '2026-05-04', '2026-05-22', '2026-06-03', '2026-07-28', '2026-08-12']
@@ -29,7 +30,7 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
     for (let i = 0; i < 30; i++) {
       const d = new Date(today)
       d.setDate(d.getDate() + i)
-      const dateStr = d.toISOString().split('T')[0]
+      const dateStr = toBangkokDateStr(d.toISOString())
       const dow = d.getDay()
       const avg = avgByDow[dow]
       const isHoliday = thaiHolidays2026.includes(dateStr)

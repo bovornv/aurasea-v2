@@ -91,9 +91,15 @@ export interface UnifiedMetric {
   cost: number | null // total cost (additional_cost_today for both)
 }
 
-/** Normalize metric_date to YYYY-MM-DD (Supabase may return timestamp format) */
+import { toBangkokDateStr } from '@/lib/businessDate'
+
+/** Normalize metric_date to Bangkok-local YYYY-MM-DD.
+ *  Supabase may return either a plain date or a UTC timestamp; if it's a
+ *  timestamp representing midnight Bangkok it comes back as
+ *  "YYYY-MM-(dd-1)T17:00:00Z", so a naive .substring(0,10) lands on the
+ *  wrong day. toBangkokDateStr handles both shapes. */
 function normalizeDate(d: string): string {
-  return d ? d.substring(0, 10) : d
+  return toBangkokDateStr(d)
 }
 
 export function accommodationToUnified(m: AccommodationDailyMetric): UnifiedMetric {

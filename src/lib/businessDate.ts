@@ -55,6 +55,45 @@ export function getTodayBangkok(): string {
 }
 
 /**
+ * Normalize any date/timestamp string to its Bangkok YYYY-MM-DD form.
+ *
+ * Handles three common shapes:
+ *   "2026-04-17"                      → "2026-04-17"  (plain date, passthrough)
+ *   "2026-04-17T00:00:00"             → "2026-04-17"  (naive timestamp, passthrough)
+ *   "2026-04-16T17:00:00+00:00"       → "2026-04-17"  (UTC timestamptz — the
+ *                                                      DB persisted midnight
+ *                                                      Bangkok = 17:00Z the
+ *                                                      previous calendar day)
+ *
+ * This is the one source of truth for the client-side "what day does this
+ * metric belong to?" question. Use it instead of `x.substring(0, 10)` which
+ * naively slices UTC and can land on the wrong Bangkok day.
+ */
+export function toBangkokDateStr(input: string | null | undefined): string {
+  if (!input) return ''
+  // Plain YYYY-MM-DD — no timezone involved, return as-is
+  if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input
+  // Naive "YYYY-MM-DDTHH:MM:SS" without a timezone suffix — the date portion
+  // is already the intended calendar day, don't shift it
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(input)) {
+    return input.substring(0, 10)
+  }
+  // Anything else (ISO with Z or +hh:mm) is a real instant — convert to Bangkok
+  const d = new Date(input)
+  if (isNaN(d.getTime())) return input.substring(0, 10)
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: BANGKOK_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const y = parts.find((p) => p.type === 'year')?.value ?? ''
+  const m = parts.find((p) => p.type === 'month')?.value ?? ''
+  const day = parts.find((p) => p.type === 'day')?.value ?? ''
+  return `${y}-${m}-${day}`
+}
+
+/**
  * Get the minimum allowed backdate
  */
 export function getMinAllowedDate(maxBackDays: number): string {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { toBangkokDateStr } from '@/lib/businessDate'
 
 export interface BranchDailyMetric {
   id: string
@@ -51,7 +52,7 @@ export function useBranchMetrics(
       .from('branch_daily_metrics')
       .select('*')
       .eq('branch_id', branchId)
-      .gte('metric_date', startDate.toISOString().split('T')[0])
+      .gte('metric_date', toBangkokDateStr(startDate.toISOString()))
       .order('metric_date', { ascending: true })
       .then(({ data: rows, error: err }: { data: BranchDailyMetric[] | null; error: { message: string } | null }) => {
         if (err) setError(err.message)

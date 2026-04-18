@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { Resend } from 'resend'
 import { EMAIL_SENDERS } from '@/lib/email/resend'
+import { getTodayBangkok, toBangkokDateStr } from '@/lib/businessDate'
 
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
         .from('branch_daily_metrics')
         .select('*')
         .eq('branch_id', branch.id)
-        .gte('metric_date', startDate.toISOString().split('T')[0])
+        .gte('metric_date', toBangkokDateStr(startDate.toISOString()))
         .order('metric_date', { ascending: true })
 
       if (!metrics?.length) continue
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
         user_id: owners[0].user_id,
         notification_type: 'weekly_report',
         channel: 'email',
-        metric_date: new Date().toISOString().split('T')[0],
+        metric_date: getTodayBangkok(),
         status: 'sent',
       })
 

@@ -11,6 +11,7 @@ import { formatBaht, formatPct, groupByWeek, formatWeekRange } from '@/lib/forma
 import { calculateDailySalaryCost } from '@/lib/calculations/hotel'
 import Link from 'next/link'
 import type { Branch, Target } from '@/lib/supabase/types'
+import { getTodayBangkok } from '@/lib/businessDate'
 
 // Health score calculation (spec Appendix 14.1)
 function calcHealthScore(
@@ -163,7 +164,7 @@ export function PortfolioView() {
   const avgScore = Math.round(branchCards.reduce((s, b) => s + b.score, 0) / branchCards.length)
   const needAttention = branchCards.filter((b) => b.score < 65).length
   const todayEntries = branchCards.filter((b) => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = getTodayBangkok()
     const bd = b === branchCards[0] ? branch1 : branch2
     return bd.metrics.data.some((d) => d.metric_date === today)
   }).length
@@ -283,7 +284,7 @@ export function PortfolioView() {
       <Section label={t('entry_compliance')}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${branchCards.length}, 1fr)`, gap: 12 }}>
           {branchCards.map((bc) => {
-            const today = new Date().toISOString().split('T')[0]
+            const today = getTodayBangkok()
             const bd = bc === branchCards[0] ? branch1 : branch2
             const todayDone = bd.metrics.data.some((d) => d.metric_date === today)
             const last7 = bd.metrics.data.filter((d) => {

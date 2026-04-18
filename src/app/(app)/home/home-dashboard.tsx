@@ -26,7 +26,14 @@ export function HomeDashboard() {
   const t = useTranslations('home')
   const tCommon = useTranslations('common')
   const [metrics, setMetrics] = useState<UnifiedMetric[]>([])
-  const [branchTarget, setBranchTarget] = useState<{ adr_target: number; cogs_target: number }>({ adr_target: 0, cogs_target: 32 })
+  const [branchTarget, setBranchTarget] = useState<{
+    adr_target: number
+    cogs_target: number
+    occupancy_target: number
+    labour_target: number
+    covers_target: number
+    avg_spend_target: number
+  }>({ adr_target: 0, cogs_target: 32, occupancy_target: 80, labour_target: 0, covers_target: 0, avg_spend_target: 0 })
   const [loading, setLoading] = useState(true)
   const [lastFetched, setLastFetched] = useState<Date | null>(null)
   const supabase = createClient()
@@ -45,9 +52,21 @@ export function HomeDashboard() {
     const db = supabase as any
     const [metricsResult, targetResult] = await Promise.all([
       db.from(table).select('*').eq('branch_id', activeBranch.id).gte('metric_date', sevenDaysAgoStr).order('metric_date', { ascending: true }),
-      db.from('targets').select('adr_target, cogs_target').eq('branch_id', activeBranch.id).maybeSingle(),
+      db.from('targets')
+        .select('adr_target, cogs_target, occupancy_target, labour_target, covers_target, avg_spend_target')
+        .eq('branch_id', activeBranch.id)
+        .maybeSingle(),
     ])
-    if (targetResult.data) setBranchTarget(targetResult.data)
+    if (targetResult.data) {
+      setBranchTarget({
+        adr_target: targetResult.data.adr_target || 0,
+        cogs_target: targetResult.data.cogs_target || 32,
+        occupancy_target: targetResult.data.occupancy_target || 80,
+        labour_target: targetResult.data.labour_target || 0,
+        covers_target: targetResult.data.covers_target || 0,
+        avg_spend_target: targetResult.data.avg_spend_target || 0,
+      })
+    }
     const rows = metricsResult.data || []
     const unified = activeBranch.business_type === 'accommodation' ? rows.map(accommodationToUnified) : rows.map(fnbToUnified)
     setMetrics(unified)
@@ -103,37 +122,156 @@ export function HomeDashboard() {
     )
   }
 
-  // Manager view
+  // Manager view — operational recommendations + KPIs (no revenue/labour/salary)
   if (role === 'manager') {
+    const occupancyTarget = branchTarget.occupancy_target || 80
+    const coversTarget = branchTarget.covers_target || 0
+    const avgSpendTarget = branchTarget.avg_spend_target || 0
+    const marginTarget = 100 - (branchTarget.cogs_target || 32)
+    const roomsAvailable = totalRooms && latest?.rooms_sold != null ? totalRooms - latest.rooms_sold : totalRooms
+    const adrGapVal = latest?.adr != null ? (latest.adr - adrTarget) : 0
+    const marginGapVal = marginPct != null ? (marginPct - marginTarget) : 0
+    const coversGapVal = latest?.customers != null ? (latest.customers - coversTarget) : 0
+    const recommendation = latest
+      ? getManagerRecommendation({
+          isHotel,
+          adr: latest.adr || 0,
+          adrTarget,
+          roomsAvailable,
+          totalRooms,
+          occupancyPct: occupancyPct || 0,
+          occupancyTarget,
+          marginPct,
+          marginTarget,
+          covers: latest.customers || 0,
+          coversTarget,
+          avgTicket: latest.avg_ticket || 0,
+          avgSpendTarget,
+        })
+      : 'เริ่มกรอกข้อมูลเพื่อรับคำแนะนำ'
+
     return (
       <PullToRefresh onRefresh={handleRefresh}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
           <StaleBadge lastFetchedAt={lastFetched} />
-          <Link
-            href="/entry"
-            className="touch-target"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-primary-action)', color: 'white', borderRadius: 'var(--radius-lg)', padding: '14px 20px', textDecoration: 'none' }}
+
+          {/* Operational recommendation card */}
+          <div
+            style={{
+              borderLeft: '3px solid #534AB7',
+              background: 'var(--color-bg)',
+              borderRadius: '0 6px 6px 0',
+              padding: '12px 16px',
+            }}
           >
-            <div>
-              <p style={{ fontSize: 'var(--font-size-md)', fontWeight: 500 }}>{t('enterData')}</p>
-              <p style={{ fontSize: 'var(--font-size-sm)', opacity: 0.8, marginTop: 2 }}>{t('enterDataSub')}</p>
-            </div>
-            <ArrowRight size={18} />
-          </Link>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: '#534AB7',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: 6,
+              }}
+            >
+              คำแนะนำวันนี้
+            </p>
+            <p style={{ fontSize: 13, fontWeight: 400, lineHeight: 1.5, color: 'var(--color-text-primary)' }}>
+              {recommendation}
+            </p>
+          </div>
+
+          {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
             {isHotel ? (
               <>
-                <KpiCard label={t('occupancyToday')} value={occupancyPct != null ? formatPercent(occupancyPct) : '-'} target={`${tCommon('target')} 80%`} status={getStatus(occupancyPct, 80)} />
-                <KpiCard label={t('roomsTonight')} value={totalRooms && latest?.rooms_sold ? `${totalRooms - latest.rooms_sold}` : '-'} subLabel={`${tCommon('from')} ${totalRooms} ${tCommon('rooms')}`} status="neutral" />
+                <KpiCard
+                  label="ADR วันนี้"
+                  value={latest?.adr ? formatCurrency(latest.adr) : '-'}
+                  target={
+                    adrTarget
+                      ? adrGapVal < 0
+                        ? `ต่ำกว่าเป้า ${formatCurrency(Math.abs(adrGapVal))}`
+                        : `เหนือเป้า ${formatCurrency(adrGapVal)}`
+                      : undefined
+                  }
+                  subLabel={adrTarget ? `เป้า ${formatCurrency(adrTarget)}` : undefined}
+                  status={getStatus(latest?.adr || 0, adrTarget)}
+                  primary
+                />
+                <KpiCard
+                  label="Occupancy"
+                  value={occupancyPct != null ? formatPercent(occupancyPct) : '-'}
+                  target={`${tCommon('target')} ${occupancyTarget}%`}
+                  status={getStatus(occupancyPct, occupancyTarget)}
+                />
+                <KpiCard
+                  label="ห้องว่างคืนนี้"
+                  value={totalRooms && latest?.rooms_sold != null ? `${roomsAvailable} ${tCommon('rooms')}` : '-'}
+                  subLabel={`${tCommon('from')} ${totalRooms} ${tCommon('rooms')}`}
+                  status="neutral"
+                />
               </>
             ) : (
               <>
-                <KpiCard label={t('coversToday')} value={latest?.customers?.toLocaleString() || '-'} status="neutral" />
-                <KpiCard label={t('marginToday')} value={marginPct != null ? formatPercent(marginPct) : '-'} status={getStatus(marginPct, 32)} />
+                <KpiCard
+                  label="Gross Margin"
+                  value={marginPct != null ? formatPercent(marginPct) : '-'}
+                  target={
+                    marginPct != null
+                      ? marginGapVal < 0
+                        ? `ต่ำกว่าเป้า ${Math.abs(Math.round(marginGapVal))}pts`
+                        : `เหนือเป้า ${Math.round(marginGapVal)}pts`
+                      : undefined
+                  }
+                  subLabel={`เป้า ${marginTarget}%`}
+                  status={getStatus(marginPct, marginTarget)}
+                  primary
+                />
+                <KpiCard
+                  label="Covers วันนี้"
+                  value={latest?.customers?.toLocaleString() || '-'}
+                  target={
+                    coversTarget && latest?.customers != null
+                      ? coversGapVal < 0
+                        ? `ต่ำกว่าเป้า ${Math.abs(coversGapVal)} คน`
+                        : `เหนือเป้า ${coversGapVal} คน`
+                      : coversTarget
+                      ? `${tCommon('target')} ${coversTarget}`
+                      : undefined
+                  }
+                  status={coversTarget ? getStatus(latest?.customers || 0, coversTarget) : 'neutral'}
+                />
+                <KpiCard
+                  label="Avg Spend"
+                  value={latest?.avg_ticket ? formatCurrency(latest.avg_ticket) : '-'}
+                  subLabel="ต่อคน"
+                  status="neutral"
+                />
               </>
             )}
           </div>
+
+          {/* Entry compliance dots */}
           <EntryStatusPanel metrics={metrics} />
+
+          {/* CTA */}
+          <Link
+            href="/entry"
+            className="flex items-center justify-center gap-2 touch-target"
+            style={{
+              padding: '8px 16px',
+              background: 'var(--color-primary-action)',
+              color: 'white',
+              fontSize: 13,
+              fontWeight: 500,
+              borderRadius: 'var(--radius-md)',
+              textDecoration: 'none',
+            }}
+          >
+            {t('enterData')}
+            <ArrowRight size={14} />
+          </Link>
         </div>
       </PullToRefresh>
     )
@@ -220,4 +358,84 @@ export function HomeDashboard() {
       </div>
     </PullToRefresh>
   )
+}
+
+// Deterministic operational recommendation for managers (no API call, no financial totals)
+function getManagerRecommendation(input: {
+  isHotel: boolean
+  adr: number
+  adrTarget: number
+  roomsAvailable: number
+  totalRooms: number
+  occupancyPct: number
+  occupancyTarget: number
+  marginPct: number | null
+  marginTarget: number
+  covers: number
+  coversTarget: number
+  avgTicket: number
+  avgSpendTarget: number
+}): string {
+  const {
+    isHotel,
+    adr,
+    adrTarget,
+    roomsAvailable,
+    totalRooms,
+    occupancyPct,
+    occupancyTarget,
+    marginPct,
+    marginTarget,
+    covers,
+    coversTarget,
+    avgTicket,
+    avgSpendTarget,
+  } = input
+
+  if (isHotel) {
+    const adrGap = adr - adrTarget
+    const suggestedWalkin = Math.round((adrTarget * 1.05) / 100) * 100
+    const roomsPct = totalRooms > 0 ? roomsAvailable / totalRooms : 0
+    const absAdrGap = Math.abs(Math.round(adrGap))
+
+    if (adrGap < -100 && roomsPct > 0.3) {
+      return `ADR เฉลี่ย 7 วันต่ำกว่าเป้า ฿${absAdrGap} — คืนนี้ยังว่างอยู่ ${roomsAvailable} ห้อง แนะนำให้ตั้งราคา walk-in ที่ ฿${suggestedWalkin} และแจ้ง front office ให้เสนอ "ราคาพิเศษวันนี้เท่านั้น" กับลูกค้าที่โทรถาม`
+    }
+    if (adrGap < -50 && roomsPct <= 0.3) {
+      return `ADR ต่ำกว่าเป้า ฿${absAdrGap} แต่ occupancy ดี — วันนี้ลองเสนอ room upgrade ให้ลูกค้าที่ check-in เพื่อเพิ่ม ADR`
+    }
+    if (adrGap >= 0 && roomsPct > 0.4) {
+      return `ADR ตามเป้า แต่คืนนี้ห้องว่างอยู่ ${roomsAvailable} ห้อง — แจ้ง OTA เพิ่ม visibility หรือเสนอราคา walk-in พิเศษช่วงบ่ายนี้`
+    }
+    if (adrGap >= 0 && roomsPct <= 0.2) {
+      return `ADR เหนือเป้า ฿${Math.round(adrGap)} และ occupancy ดีมาก — รักษา service มาตรฐานและขอ review จากลูกค้า`
+    }
+    if (occupancyTarget > 0 && occupancyPct < occupancyTarget * 0.7) {
+      return `Occupancy ${Math.round(occupancyPct)}% ต่ำกว่าเป้า ${occupancyTarget}% มาก — ติดต่อ OTA เพื่อโปรโมท last-minute deals และตรวจสอบว่า listing อัปเดตล่าสุดแล้ว`
+    }
+    return 'วันนี้ทุกอย่างอยู่ในเกณฑ์ดี — เน้น service คุณภาพและ upsell breakfast หรือ room upgrade ให้ลูกค้า'
+  }
+
+  // F&B
+  const marginGap = marginPct != null ? marginPct - marginTarget : 0
+  const coversGap = covers - coversTarget
+  const absMarginGap = Math.abs(Math.round(marginGap))
+  const absCoversGap = Math.abs(coversGap)
+
+  if (marginPct != null && marginGap < -5 && coversGap < 0) {
+    return `Margin ${Math.round(marginPct)}% ต่ำกว่าเป้า ${absMarginGap}pts และ covers น้อยกว่าเป้า ${absCoversGap} คน — ตรวจสอบ portion size และ waste ก่อนเปิดร้านพรุ่งนี้`
+  }
+  if (marginPct != null && marginGap < -3 && coversGap >= 0) {
+    return `ลูกค้าตามเป้า แต่ margin ต่ำกว่าเป้า ${absMarginGap}pts — น่าจะมาจาก COGS หรือ waste ลองตรวจ portion และการสั่งวัตถุดิบ`
+  }
+  if (marginPct != null && marginGap >= 0 && coversGap < -10) {
+    return `Margin ดี ${Math.round(marginPct)}% แต่ covers น้อยกว่าเป้า ${absCoversGap} คน — ลองโปรโมชันช่วงเที่ยงหรือ afternoon set เพื่อดึงลูกค้าเพิ่ม`
+  }
+  if (marginPct != null && marginGap >= 0 && coversGap >= 0) {
+    return `วันนี้ทั้ง margin และ covers ตามเป้า — เน้น upsell เครื่องดื่มและของหวาน เพื่อเพิ่ม avg spend จาก ฿${Math.round(avgTicket)}`
+  }
+  if (avgSpendTarget > 0 && avgTicket < avgSpendTarget * 0.85) {
+    return `Avg spend ฿${Math.round(avgTicket)} ต่ำกว่าเป้า — แนะนำเมนูพิเศษหรือ combo set ให้พนักงานเสิร์ฟ upsell กับทุกโต๊ะ`
+  }
+  return 'วันนี้ร้านอยู่ในเกณฑ์ดี — รักษา service และความสะอาด ขอ review จากลูกค้าที่ประทับใจ'
 }

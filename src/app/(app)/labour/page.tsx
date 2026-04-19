@@ -16,7 +16,7 @@ export default function LabourPage() {
   if (role !== 'owner' && role !== 'superadmin') {
     return (
       <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>
-        แท็บนี้เห็นได้เฉพาะ Owner
+        {t('owner_only')}
       </div>
     )
   }

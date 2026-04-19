@@ -18,6 +18,17 @@ interface Props {
   totalRooms: number
 }
 
+// Shared colour palette — kept in sync with Chart.js dataset colours so
+// the HTML legend swatches line up visually with the lines on the chart.
+const COLORS = {
+  labour: '#A32D2D',
+  occupancy: 'rgba(29,158,117,0.6)',
+  revenue: '#1D9E75',
+  fixedCost: '#A32D2D',
+  breakeven: '#BA7517',
+  target: 'rgba(0,0,0,0.25)',
+}
+
 export function LabourView({ branchId, isHotel }: Props) {
   const { data, loading } = useBranchMetrics(branchId, 30)
   const { targets } = useTargets(branchId)
@@ -65,14 +76,23 @@ export function LabourView({ branchId, isHotel }: Props) {
     })
   }, [data, dailyCost])
 
-  // Insight text
+  // Insight text — built from i18n with interpolation so it fully
+  // switches language instead of baking in Thai prose.
   const insight = useMemo(() => {
     if (!stats) return null
     if (stats.breakevenPct >= 100) {
-      return `รายได้วันนี้ ${formatBaht(stats.todayRevenue)} เหนือ breakeven ${formatBaht(minRevenue)} — Labour cost ${formatPct(stats.todayLabour)} อยู่ในเกณฑ์ที่ดี`
+      return t('above_breakeven_detail', {
+        revenue: formatBaht(stats.todayRevenue),
+        breakeven: formatBaht(minRevenue),
+        labourPct: formatPct(stats.todayLabour),
+      })
     }
-    return `รายได้วันนี้ ${formatBaht(stats.todayRevenue)} ยังต่ำกว่า breakeven ${formatBaht(minRevenue)} — ต้องการรายได้เพิ่มอีก ${formatBaht(minRevenue - stats.todayRevenue)} เพื่อให้ Labour% อยู่ที่เป้า`
-  }, [stats, minRevenue])
+    return t('below_breakeven_detail', {
+      revenue: formatBaht(stats.todayRevenue),
+      breakeven: formatBaht(minRevenue),
+      gap: formatBaht(minRevenue - stats.todayRevenue),
+    })
+  }, [stats, minRevenue, t])
 
   if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
 
@@ -102,20 +122,27 @@ export function LabourView({ branchId, isHotel }: Props) {
           <KpiCard label={t('avg_labour_pct')} value={formatPct(stats.avgLabour)} target={formatPct(labourTarget, 0)} status={stats.avgLabour <= labourTarget ? 'green' : stats.avgLabour <= labourTarget + 5 ? 'amber' : 'red'} primary />
           <KpiCard label={t('days_over_target')} value={`${stats.daysOver} / 30`} status={stats.daysOver <= 3 ? 'green' : stats.daysOver <= 8 ? 'amber' : 'red'} />
           <KpiCard label={t('daily_cost')} value={formatBaht(dailyCost)} status="neutral" />
-          <KpiCard label={t('min_revenue')} value={formatBaht(minRevenue)} subLabel={isHotel ? `≈ ${calculateMinRoomsForLabourTarget(minRevenue, adrTarget)} ห้อง` : `≈ ${calculateMinCoversForLabourTarget(dailyCost, labourTarget, avgSpendTarget)} covers`} status="neutral" />
+          <KpiCard label={t('min_revenue')} value={formatBaht(minRevenue)} subLabel={isHotel ? `≈ ${calculateMinRoomsForLabourTarget(minRevenue, adrTarget)} ${t('rooms_unit')}` : `≈ ${calculateMinCoversForLabourTarget(dailyCost, labourTarget, avgSpendTarget)} ${t('covers_unit')}`} status="neutral" />
         </div>
       )}
 
       {/* Dual-axis chart: Labour% vs Occupancy/Covers */}
-      <Section label={`Labour% vs ${isHotel ? 'Occupancy' : 'Covers'}`}>
+      <Section label={isHotel ? t('chart_labour_vs_occ') : t('chart_labour_vs_covers')}>
+        <ChartLegend
+          items={[
+            { color: COLORS.labour, label: t('line_labour_pct'), axisHint: t('left_axis') },
+            { color: COLORS.occupancy, label: isHotel ? t('line_occupancy') : t('line_covers'), axisHint: t('right_axis') },
+            { color: COLORS.target, label: `${t('target_line')} ${formatPct(labourTarget, 0)}`, dashed: true },
+          ]}
+        />
         <LineChart
           labels={chartLabels}
           datasets={[
-            { data: labourData, color: '#A32D2D', label: 'Labour%' },
-            { data: secondaryData, color: 'rgba(29,158,117,0.6)', label: isHotel ? 'Occupancy%' : 'Covers', yAxisID: 'y2' },
+            { data: labourData, color: COLORS.labour, label: t('line_labour_pct') },
+            { data: secondaryData, color: COLORS.occupancy, label: isHotel ? t('line_occupancy') : t('line_covers'), yAxisID: 'y2' },
           ]}
           targetValue={labourTarget}
-          targetLabel={`${t('avg_labour_pct')} ${formatPct(labourTarget, 0)}`}
+          targetLabel={`${t('target_line')} ${formatPct(labourTarget, 0)}`}
           yFormatter={(v) => formatPct(v, 0)}
           y2Formatter={isHotel ? (v) => formatPct(v, 0) : (v) => `${Math.round(v)}`}
         />
@@ -142,13 +169,20 @@ export function LabourView({ branchId, isHotel }: Props) {
       )}
 
       {/* Revenue vs fixed cost chart */}
-      <Section label="รายได้ vs ต้นทุนแรงงาน">
+      <Section label={t('chart_revenue_vs_cost')}>
+        <ChartLegend
+          items={[
+            { color: COLORS.revenue, label: t('line_revenue') },
+            { color: COLORS.fixedCost, label: t('line_fixed_cost'), dashed: true },
+            { color: COLORS.breakeven, label: t('line_breakeven'), dashed: true },
+          ]}
+        />
         <LineChart
           labels={chartLabels}
           datasets={[
-            { data: data.map((d) => d.revenue), color: '#1D9E75', label: 'รายได้จริง' },
-            { data: data.map(() => dailyCost), color: '#A32D2D', label: 'ต้นทุนแรงงาน/วัน', dashed: true },
-            { data: data.map(() => minRevenue), color: '#BA7517', label: 'Breakeven', dashed: true },
+            { data: data.map((d) => d.revenue), color: COLORS.revenue, label: t('line_revenue') },
+            { data: data.map(() => dailyCost), color: COLORS.fixedCost, label: t('line_fixed_cost'), dashed: true },
+            { data: data.map(() => minRevenue), color: COLORS.breakeven, label: t('line_breakeven'), dashed: true },
           ]}
           yFormatter={(v) => formatBaht(v)}
         />
@@ -159,7 +193,7 @@ export function LabourView({ branchId, isHotel }: Props) {
         <div style={{ background: 'var(--color-red-light)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '14px 16px' }}>
           <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{t('waste_estimate')}</p>
           <p style={{ fontSize: 'var(--font-size-lg)', fontWeight: 500, color: 'var(--color-negative)' }}>{formatBaht(stats.wasteTotal)}</p>
-          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>ถ้า Labour% อยู่ที่เป้า {formatPct(labourTarget, 0)} ทุกวัน จะประหยัดได้ประมาณนี้ใน 30 วัน</p>
+          <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>{t('waste_desc', { target: formatPct(labourTarget, 0) })}</p>
         </div>
       )}
 
@@ -178,15 +212,15 @@ export function LabourView({ branchId, isHotel }: Props) {
       {/* Settings shortcut */}
       <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px 16px' }}>
         <div className="flex justify-between" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
-          <span>เงินเดือน/เดือน</span><span>{formatBaht(monthlySalary)}</span>
+          <span>{t('salary_label')}</span><span>{formatBaht(monthlySalary)}</span>
         </div>
         <div className="flex justify-between" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-          <span>วันทำงาน</span><span>{operatingDays} วัน</span>
+          <span>{t('operating_days_label')}</span><span>{operatingDays} {t('days_suffix')}</span>
         </div>
         <div className="flex justify-between" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-          <span>เป้า Labour%</span><span>{formatPct(labourTarget, 0)}</span>
+          <span>{t('target_label')}</span><span>{formatPct(labourTarget, 0)}</span>
         </div>
-        <Link href="/settings/targets" style={{ display: 'block', fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', marginTop: 8, textDecoration: 'none' }}>แก้ไขใน Settings →</Link>
+        <Link href="/settings/targets" style={{ display: 'block', fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', marginTop: 8, textDecoration: 'none' }}>{t('edit_settings')}</Link>
       </div>
     </div>
   )
@@ -197,6 +231,45 @@ function Section({ label, children }: { label: string; children: React.ReactNode
     <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
       <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 12 }}>{label}</p>
       {children}
+    </div>
+  )
+}
+
+interface LegendItem {
+  color: string
+  label: string
+  axisHint?: string
+  dashed?: boolean
+}
+
+function ChartLegend({ items }: { items: LegendItem[] }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 14,
+        flexWrap: 'wrap',
+        marginBottom: 10,
+        fontSize: 12,
+      }}
+    >
+      {items.map((item) => (
+        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              width: 24,
+              height: 0,
+              flexShrink: 0,
+              borderTop: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.color}`,
+              borderRadius: 1,
+            }}
+          />
+          <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
+          {item.axisHint && (
+            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>({item.axisHint})</span>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

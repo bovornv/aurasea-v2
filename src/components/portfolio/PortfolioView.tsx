@@ -74,12 +74,11 @@ function calcHealthScore(
   return Math.round(targetScore * 0.3 + labourScore * 0.2 + volumeScore * 0.25 + trendScore * 0.15 + entryScore * 0.1)
 }
 
-function HealthRing({ score, size = 80 }: { score: number; size?: number }) {
+function HealthRing({ score, verdict, size = 80 }: { score: number; verdict: string; size?: number }) {
   const radius = (size - 8) / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (score / 100) * circumference
   const color = score >= 80 ? 'var(--color-positive)' : score >= 65 ? 'var(--color-amber)' : 'var(--color-negative)'
-  const verdict = score >= 80 ? 'ดี' : score >= 65 ? 'ต้องระวัง' : 'ต้องแก้ไข'
 
   return (
     <div style={{ textAlign: 'center' }}>
@@ -91,6 +90,12 @@ function HealthRing({ score, size = 80 }: { score: number; size?: number }) {
       <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color, marginTop: 4 }}>{verdict}</p>
     </div>
   )
+}
+
+function healthVerdictKey(score: number): 'health_good' | 'health_watch' | 'health_action' {
+  if (score >= 80) return 'health_good'
+  if (score >= 65) return 'health_watch'
+  return 'health_action'
 }
 
 function useBranchData(branch: Branch) {
@@ -124,41 +129,46 @@ export function PortfolioView() {
       const labourPct = data.length > 0 && dailyCost > 0 ? (dailyCost / (totalRevenue / data.length)) * 100 : null
       const entryDays = data.length
 
-      // Issues
+      // Issues — built from i18n templates so they flip language.
       const issues: string[] = []
       if (isHotel && tgts?.adr_target) {
         const avgAdr = data.filter((d) => d.adr).reduce((s, d) => s + (d.adr || 0), 0) / (data.filter((d) => d.adr).length || 1)
-        if (avgAdr < Number(tgts.adr_target)) issues.push(`ADR ต่ำกว่าเป้า ${formatBaht(Number(tgts.adr_target) - avgAdr)}`)
+        if (avgAdr < Number(tgts.adr_target)) {
+          issues.push(t('adr_below_target', { gap: formatBaht(Number(tgts.adr_target) - avgAdr) }))
+        }
       }
       if (!isHotel && tgts?.cogs_target) {
         const margins = data.filter((d) => d.margin != null).map((d) => d.margin!)
         const avgMargin = margins.length > 0 ? margins.reduce((a, b) => a + b, 0) / margins.length : 0
-        if (avgMargin < 100 - Number(tgts.cogs_target)) issues.push(`Margin ต่ำกว่าเป้า ${formatPct(100 - Number(tgts.cogs_target) - avgMargin)}`)
+        if (avgMargin < 100 - Number(tgts.cogs_target)) {
+          issues.push(t('margin_below_target', { gap: formatPct(100 - Number(tgts.cogs_target) - avgMargin) }))
+        }
       }
       if (labourPct != null && tgts?.labour_target && labourPct > Number(tgts.labour_target)) {
-        issues.push(`Labour% ${formatPct(labourPct)} เกินเป้า`)
+        issues.push(t('labour_over_target', { pct: formatPct(labourPct) }))
       }
 
-      // Primary metric
+      // Primary metric label — the slash pair stays identical in both
+      // locales because ADR / Occ / Margin / Covers are industry terms.
       let primaryLabel = '', primaryValue = ''
       if (isHotel) {
         const avgAdr = data.filter((d) => d.adr).reduce((s, d) => s + (d.adr || 0), 0) / (data.filter((d) => d.adr).length || 1)
         const avgOcc = data.filter((d) => d.occupancy_rate != null).reduce((s, d) => s + (d.occupancy_rate || 0), 0) / (data.filter((d) => d.occupancy_rate != null).length || 1)
-        primaryLabel = 'ADR / Occ'
+        primaryLabel = t('adr_occ')
         primaryValue = `${formatBaht(avgAdr)} / ${formatPct(avgOcc, 0)}`
       } else {
         const margins = data.filter((d) => d.margin != null).map((d) => d.margin!)
         const avgMargin = margins.length > 0 ? margins.reduce((a, b) => a + b, 0) / margins.length : 0
         const avgCovers = data.filter((d) => d.customers != null).reduce((s, d) => s + (d.customers || 0), 0) / (data.filter((d) => d.customers != null).length || 1)
-        primaryLabel = 'Margin / Covers'
+        primaryLabel = t('margin_covers')
         primaryValue = `${formatPct(avgMargin, 0)} / ${Math.round(avgCovers)}`
       }
 
       return { branch, score, totalRevenue, labourPct, entryDays, issues, primaryLabel, primaryValue, isHotel }
     })
-  }, [branches, branch1, branch2])
+  }, [branches, branch1, branch2, t])
 
-  if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+  if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{t('loading')}</div>
 
   const totalRevenue = branchCards.reduce((s, b) => s + b.totalRevenue, 0)
   const avgScore = Math.round(branchCards.reduce((s, b) => s + b.score, 0) / branchCards.length)
@@ -174,10 +184,38 @@ export function PortfolioView() {
   const allWeeks2 = groupByWeek(branch2.metrics.data).slice(-4)
   const weekLabels = allWeeks1.map((w) => formatWeekRange(w.map((d) => d.metric_date)))
 
-  // Insight
+  // Insight — built from i18n templates so it flips with the locale
+  // instead of baking in Thai prose.
   const best = branchCards.reduce((a, b) => a.score > b.score ? a : b)
   const worst = branchCards.reduce((a, b) => a.score < b.score ? a : b)
-  const insightText = `${best.branch.name} ทำผลงานได้ดีที่สุดด้วยคะแนน ${best.score} — ${worst.branch.name} คือสาขาที่ต้องให้ความสนใจ${worst.issues.length > 0 ? ` (${worst.issues[0]})` : ''}`
+  const insightText = worst.issues.length > 0
+    ? t('insight_template_with_issue', {
+        best: best.branch.name,
+        score: best.score,
+        worst: worst.branch.name,
+        issue: worst.issues[0],
+      })
+    : t('insight_template', {
+        best: best.branch.name,
+        score: best.score,
+        worst: worst.branch.name,
+      })
+
+  // Three-action recommendation list
+  const highLabourBranches = branchCards.filter((b) => b.labourPct != null && b.labourPct > 30)
+  const labourAction = highLabourBranches.length > 1
+    ? t('action_labour_all', { count: branchCards.length })
+    : highLabourBranches.length === 1
+    ? t('action_labour_one', { branch: highLabourBranches[0].branch.name })
+    : t('action_labour_ok')
+
+  const actions: string[] = [
+    worst.issues.length > 0
+      ? t('action_branch_issue', { branch: worst.branch.name, issue: worst.issues[0] })
+      : t('action_branch_review', { branch: worst.branch.name }),
+    labourAction,
+    t('action_best_branch', { branch: best.branch.name, metric: best.primaryLabel }),
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -185,7 +223,7 @@ export function PortfolioView() {
 
       {/* KPI summary row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
-        <KpiCard label={t('total_revenue')} value={formatBaht(totalRevenue)} subLabel="30 วัน" status="neutral" />
+        <KpiCard label={t('total_revenue')} value={formatBaht(totalRevenue)} subLabel={t('days_30')} status="neutral" />
         <KpiCard label={t('portfolio_score')} value={`${avgScore}`} status={avgScore >= 80 ? 'green' : avgScore >= 65 ? 'amber' : 'red'} />
         <KpiCard label={t('branches_need_attention')} value={`${needAttention}`} status={needAttention === 0 ? 'green' : 'red'} />
         <KpiCard label={t('entry_today')} value={`${todayEntries}/${branches.length}`} status={todayEntries === branches.length ? 'green' : 'amber'} />
@@ -204,13 +242,13 @@ export function PortfolioView() {
           }}
         >
           <div className="flex items-start gap-4">
-            <HealthRing score={bc.score} size={72} />
+            <HealthRing score={bc.score} verdict={t(healthVerdictKey(bc.score))} size={72} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--color-text-primary)' }}>{bc.branch.name}</p>
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)', marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span>{bc.primaryLabel}: {bc.primaryValue}</span>
                 {bc.labourPct != null && <span>Labour%: <span style={{ color: bc.labourPct <= 30 ? 'var(--color-positive)' : 'var(--color-negative)' }}>{formatPct(bc.labourPct)}</span></span>}
-                <span>Entry: {bc.entryDays}/30 วัน</span>
+                <span>{t('entry_label')}: {t('entry_days_of_30', { days: bc.entryDays })}</span>
               </div>
               {bc.issues.length > 0 && (
                 <div style={{ marginTop: 6 }}>
@@ -264,15 +302,7 @@ export function PortfolioView() {
 
       {/* 3-action list */}
       <Section label={t('actions_title')}>
-        {[
-          worst.issues.length > 0 ? `${worst.branch.name}: ${worst.issues[0]}` : `${worst.branch.name}: ตรวจสอบผลงานย้อนหลัง`,
-          branchCards.filter((b) => b.labourPct != null && b.labourPct > 30).length > 1
-            ? `ทั้ง ${branchCards.length} สาขา: ตรวจตารางกะเพื่อลด Labour%`
-            : branchCards.find((b) => b.labourPct != null && b.labourPct > 30)
-            ? `${branchCards.find((b) => b.labourPct != null && b.labourPct > 30)!.branch.name}: ปรับกะเพื่อลด Labour cost`
-            : `ทุกสาขา: Labour% ตามเป้า — รักษาระดับนี้`,
-          `${best.branch.name}: ${best.primaryLabel} ดี — หาโอกาสเพิ่ม margin ต่อ`,
-        ].map((action, i) => (
+        {actions.map((action, i) => (
           <div key={i} className="flex items-start gap-3" style={{ marginBottom: 10 }}>
             <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--color-accent-light)', color: 'var(--color-accent-text)', fontSize: 11, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
             <p style={{ fontSize: 13, color: 'var(--color-text-primary)', lineHeight: 1.5 }}>{action}</p>
@@ -281,7 +311,7 @@ export function PortfolioView() {
       </Section>
 
       {/* Entry compliance */}
-      <Section label={t('entry_compliance')}>
+      <Section label={t('entry_all_branches')}>
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${branchCards.length}, 1fr)`, gap: 12 }}>
           {branchCards.map((bc) => {
             const today = getTodayBangkok()
@@ -297,9 +327,9 @@ export function PortfolioView() {
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: bc.isHotel ? 'var(--color-accent)' : 'var(--color-green)' }} />
                   <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-primary)' }}>{bc.branch.name}</span>
                 </div>
-                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>7 วัน: {last7}/7</p>
-                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>เดือน: {bc.entryDays}/30</p>
-                <p style={{ fontSize: 'var(--font-size-xs)', color: todayDone ? 'var(--color-positive)' : 'var(--color-negative)', marginTop: 2 }}>{todayDone ? 'กรอกแล้ว ✓' : 'ยังไม่ได้กรอก'}</p>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{t('entry_last_7', { done: last7 })}</p>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{t('entry_month', { done: bc.entryDays })}</p>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: todayDone ? 'var(--color-positive)' : 'var(--color-negative)', marginTop: 2 }}>{todayDone ? t('entry_done_today') : t('entry_not_done_today')}</p>
               </div>
             )
           })}

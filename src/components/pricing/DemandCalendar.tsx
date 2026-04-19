@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import type { BranchDailyMetric } from '@/hooks/useBranchMetrics'
 import { toBangkokDateStr } from '@/lib/businessDate'
 
@@ -10,6 +10,9 @@ const thaiHolidays2026 = ['2026-05-01', '2026-05-04', '2026-05-22', '2026-06-03'
 
 export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
   const t = useTranslations('pricing')
+  const locale = useLocale()
+  const isThai = locale === 'th'
+  const monthLocale = isThai ? 'th-TH-u-ca-buddhist' : 'en-GB'
 
   const calendar = useMemo(() => {
     // Calculate avg occupancy by day of week (0=Sun ... 6=Sat)
@@ -25,8 +28,14 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
     )
 
     // Generate next 30 days
-    const days: { date: string; label: string; level: 'low' | 'medium' | 'high' }[] = []
+    const days: {
+      date: string
+      label: string
+      level: 'low' | 'medium' | 'high'
+      monthLabel: string | null
+    }[] = []
     const today = new Date()
+    let prevMonth = -1
     for (let i = 0; i < 30; i++) {
       const d = new Date(today)
       d.setDate(d.getDate() + i)
@@ -39,10 +48,31 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
       if (isHoliday || avg > 80) level = 'high'
       else if (avg >= 60) level = 'medium'
 
-      days.push({ date: dateStr, label: `${d.getDate()}`, level })
+      const month = d.getMonth()
+      // Tag the first cell AND the day that starts each new month inside
+      // the window so users can see where e.g. April flips to May.
+      const monthLabel = month !== prevMonth
+        ? d.toLocaleDateString(monthLocale, { month: 'short' })
+        : null
+      prevMonth = month
+
+      days.push({ date: dateStr, label: `${d.getDate()}`, level, monthLabel })
     }
     return days
-  }, [data])
+  }, [data, monthLocale])
+
+  // Header: "19 Apr – 18 May 2026" / "19 เม.ย. – 18 พ.ค. 2569"
+  const rangeLabel = useMemo(() => {
+    if (calendar.length === 0) return ''
+    const first = new Date(calendar[0].date + 'T00:00:00')
+    const last = new Date(calendar[calendar.length - 1].date + 'T00:00:00')
+    const sameYear = first.getFullYear() === last.getFullYear()
+    const firstStr = first.toLocaleDateString(monthLocale, sameYear
+      ? { day: 'numeric', month: 'short' }
+      : { day: 'numeric', month: 'short', year: 'numeric' })
+    const lastStr = last.toLocaleDateString(monthLocale, { day: 'numeric', month: 'short', year: 'numeric' })
+    return `${firstStr} – ${lastStr}`
+  }, [calendar, monthLocale])
 
   // Pad to start on Monday
   const firstDay = new Date(calendar[0]?.date + 'T00:00:00')
@@ -56,7 +86,10 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
 
   return (
     <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
-      <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12 }}>{t('demand_calendar')}</p>
+      <div className="flex items-baseline justify-between" style={{ marginBottom: 12, gap: 8 }}>
+        <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('demand_calendar')}</p>
+        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>{rangeLabel}</p>
+      </div>
 
       {/* Day headers */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 4 }}>
@@ -76,6 +109,7 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
             style={{
               aspectRatio: '1',
               display: 'flex',
+              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 'var(--radius-sm)',
@@ -83,9 +117,15 @@ export function DemandCalendar({ data }: { data: BranchDailyMetric[] }) {
               fontWeight: 500,
               background: colors[day.level].bg,
               color: colors[day.level].text,
+              lineHeight: 1.1,
             }}
           >
-            {day.label}
+            {day.monthLabel && (
+              <span style={{ fontSize: 9, fontWeight: 500, opacity: 0.75, marginBottom: 1 }}>
+                {day.monthLabel}
+              </span>
+            )}
+            <span>{day.label}</span>
           </div>
         ))}
       </div>

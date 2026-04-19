@@ -36,6 +36,12 @@ export default function EntryPage() {
   const [existingAccom, setExistingAccom] = useState<AccommodationDailyMetric | null>(null)
   const [existingFnb, setExistingFnb] = useState<FnbDailyMetric | null>(null)
   const [target, setTarget] = useState<Target | null>(null)
+  // Entry forms seed their local state from `existing` via useState — which
+  // only reads the initial value on mount. If we render the form before the
+  // fetch for the new date resolves, it mounts with the *previous* date's
+  // data and then ignores later prop changes. Gate the form behind this flag
+  // so it only mounts once the correct record is in hand.
+  const [loadingEntry, setLoadingEntry] = useState(true)
   const [saving, setSaving] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submittedData, setSubmittedData] = useState<Record<string, unknown>>({})
@@ -51,6 +57,7 @@ export default function EntryPage() {
   // Load existing entry + targets
   const loadData = useCallback(async () => {
     if (!activeBranch) return
+    setLoadingEntry(true)
     setSubmitted(false)
     setExistingAccom(null)
     setExistingFnb(null)
@@ -69,6 +76,7 @@ export default function EntryPage() {
       setExistingFnb(entryResult.data as FnbDailyMetric | null)
     }
     setTarget(targetResult.data as Target | null)
+    setLoadingEntry(false)
   }, [activeBranch, date, supabase, isHotel])
 
   useEffect(() => { loadData() }, [loadData])
@@ -206,7 +214,14 @@ export default function EntryPage() {
       <div className="flex items-center gap-2" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
         <BranchTypeBadge type={activeBranch.business_type} size="sm" />
         <span>{activeBranch.name}</span>
-        {(existingAccom || existingFnb) && (
+        {/* "Editing" only if the fetched row actually belongs to the date
+            shown. Defence-in-depth: loadingEntry normally prevents stale
+            rows being visible, but the date check catches anything that
+            slips through. */}
+        {!loadingEntry && (
+          (isHotel && existingAccom && existingAccom.metric_date?.startsWith(date)) ||
+          (!isHotel && existingFnb && existingFnb.metric_date?.startsWith(date))
+        ) && (
           <span style={{
             fontSize: 10, fontWeight: 500,
             padding: '1px 8px',
@@ -219,8 +234,20 @@ export default function EntryPage() {
         )}
       </div>
 
-      {/* Form */}
-      {isHotel ? (
+      {/* Form — only mount after the fetch for the selected date has
+          resolved, so the form's useState initializer reads the correct
+          `existing` instead of whatever the previous date had. */}
+      {loadingEntry ? (
+        <div
+          style={{
+            background: 'var(--color-bg-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '80px 20px',
+          }}
+          aria-busy="true"
+        />
+      ) : isHotel ? (
         <AccommodationEntryForm
           key={date}
           existing={existingAccom}

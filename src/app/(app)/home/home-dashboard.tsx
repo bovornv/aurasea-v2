@@ -103,11 +103,35 @@ export function HomeDashboard() {
   // number owners actually care about; gross is a fallback, not equal.
   const operatingDays = branchTarget.operating_days || 26
   const netMarginMode: 'net' | 'gross' = !isHotel && monthlySalary > 0 && operatingDays > 0 ? 'net' : 'gross'
-  const marginPct = latest
-    ? netMarginMode === 'net'
-      ? calculateNetMargin(latest.revenue, latest.cost, monthlySalary, operatingDays)
-      : calculateGrossMarginStrict(latest.revenue, latest.cost)
-    : null
+  // Aggregate margin over the 7-day window (same shape as Trends' tile).
+  // Using the single latest row broke whenever today had revenue+covers
+  // entered but no cost yet — net margin came back null and the card
+  // rendered "-". Aggregating over days-with-cost yields a number as
+  // long as *any* recent day has a complete entry, which matches what
+  // the Trends tab shows for the same venue + period.
+  const marginPct: number | null = (() => {
+    if (isHotel) {
+      return latest
+        ? calculateGrossMarginStrict(latest.revenue, latest.cost)
+        : null
+    }
+    const withCost = metrics.filter(
+      (m) => (m.revenue || 0) > 0 && (m.cost || 0) > 0,
+    )
+    if (withCost.length === 0) return null
+    const totalRevenue = withCost.reduce((s, m) => s + m.revenue, 0)
+    const totalCost = withCost.reduce((s, m) => s + (m.cost || 0), 0)
+    if (totalRevenue <= 0) return null
+    if (netMarginMode === 'net') {
+      const totalSalary = (monthlySalary / operatingDays) * withCost.length
+      const pct = ((totalRevenue - totalCost - totalSalary) / totalRevenue) * 100
+      if (pct > 80 || pct < -100) return null
+      return Math.round(pct * 10) / 10
+    }
+    const pct = (1 - totalCost / totalRevenue) * 100
+    if (pct > 85 || pct < 0) return null
+    return Math.round(pct * 10) / 10
+  })()
   // Net margin target = gross margin target minus the average payroll
   // share of revenue. For display only — no need to recompute weekly.
   const grossMarginTarget = 100 - branchTarget.cogs_target
@@ -260,8 +284,12 @@ export function HomeDashboard() {
                         : `เหนือเป้า ${Math.round(marginGapVal)}pts`
                       : undefined
                   }
-                  subLabel={`${tCommon('target')} ${Math.round(managerMarginTarget)}%`}
-                  status={getStatus(marginPct, managerMarginTarget)}
+                  subLabel={
+                    marginPct != null
+                      ? `${tCommon('target')} ${Math.round(managerMarginTarget)}% · ${t('marginSevenDayAvg')}`
+                      : t('marginNoDataTooltip')
+                  }
+                  status={marginPct != null ? getStatus(marginPct, managerMarginTarget) : 'neutral'}
                   primary
                 />
                 <KpiCard
@@ -362,9 +390,15 @@ export function HomeDashboard() {
             <KpiCard
               label={netMarginMode === 'net' ? t('marginAfterSalary') : t('marginExclSalary')}
               value={marginPct != null ? formatPercent(marginPct) : '-'}
-              target={`${tCommon('target')} ${Math.round(marginTarget)}%`}
-              subLabel={netMarginMode === 'gross' ? t('setSalaryPrompt') : undefined}
-              status={getStatus(marginPct, marginTarget)}
+              target={marginPct != null ? `${tCommon('target')} ${Math.round(marginTarget)}%` : undefined}
+              subLabel={
+                marginPct != null
+                  ? netMarginMode === 'gross'
+                    ? `${t('setSalaryPrompt')} · ${t('marginSevenDayAvg')}`
+                    : t('marginSevenDayAvg')
+                  : t('marginNoDataTooltip')
+              }
+              status={marginPct != null ? getStatus(marginPct, marginTarget) : 'neutral'}
               primary
             />
             <KpiCard label={t('covers')} value={latest?.customers?.toLocaleString() || '-'} status="neutral" />

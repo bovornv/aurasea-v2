@@ -51,3 +51,31 @@ export function rolling7DayAvg(
   if (values.length === 0) return 0
   return values.reduce((sum, v) => sum + v, 0) / values.length
 }
+
+/**
+ * Rolling average over the last `window` days ending at `referenceDate`.
+ *
+ * Unlike `rolling7DayAvg`, this one is *strict*: missing days are excluded
+ * from the average entirely (no historical back-fill, no zero-fill). Returns
+ * `null` until the window contains at least `minSamples` real values — so
+ * the chart draws an honest gap at the start of the series instead of a
+ * warm-up line drawn from a single data point.
+ *
+ * Used by the Trends margin chart: treating a missing day as 0% dragged the
+ * line to the floor, making daily margin look catastrophically spiky.
+ */
+export function rollingAvg(
+  entries: { date: string; value: number | null }[],
+  referenceDate: string,
+  window: number,
+  minSamples: number = Math.ceil(window / 2),
+): number | null {
+  if (window <= 0) return null
+  const startStr = addDaysToDateStr(referenceDate, -(window - 1))
+  const windowEntries = entries.filter(
+    (e) => e.date >= startStr && e.date <= referenceDate && e.value != null,
+  )
+  if (windowEntries.length < minSamples) return null
+  const sum = windowEntries.reduce((s, e) => s + (e.value as number), 0)
+  return sum / windowEntries.length
+}

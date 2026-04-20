@@ -16,7 +16,7 @@ import {
   calculateNetMargin,
   calculateGrossMarginStrict,
 } from '@/lib/calculations/fnb'
-import { rolling7DayAvg } from '@/lib/calculations/rolling'
+import { rolling7DayAvg, rollingAvg } from '@/lib/calculations/rolling'
 import Link from 'next/link'
 
 // Shared palette so the HTML legend swatches track the Chart.js line
@@ -38,6 +38,7 @@ type MarginMode = 'net' | 'gross'
 
 export function FnbTrendsView({ branchId }: { branchId: string }) {
   const [period, setPeriod] = useState<30 | 90>(30)
+  const [rollingWindow, setRollingWindow] = useState<7 | 14>(7)
   const { data, loading } = useBranchMetrics(branchId, period)
   const { targets } = useTargets(branchId)
   const { plan } = useUser()
@@ -56,16 +57,30 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
   // view (KPI, chart, weekly table, target line) switches to net.
   const mode: MarginMode = monthlySalary > 0 && operatingDays > 0 ? 'net' : 'gross'
 
-  // Daily margin series — net when we can, gross otherwise. Returns
-  // null for days missing cost so spanGaps:false shows an honest gap.
-  const dailyMargin = useMemo(
-    () => data.map((d) =>
-      mode === 'net'
+  // Per-day margin points (net or gross). null for days missing cost —
+  // these feed the rolling average and are *excluded* from the window
+  // sum (not zero-filled), so one blank day doesn't drag the line down.
+  const dailyMarginPoints = useMemo(
+    () => data.map((d) => ({
+      date: d.metric_date,
+      value: mode === 'net'
         ? calculateNetMargin(d.revenue, d.additional_cost_today, monthlySalary, operatingDays)
         : calculateGrossMarginStrict(d.revenue, d.additional_cost_today),
-    ),
+    })),
     [data, mode, monthlySalary, operatingDays],
   )
+
+  // Rolling-average margin series (default 7 days, toggleable to 14).
+  // Returns null until the window has enough real samples — `LineChart`
+  // renders those as gaps, so the line starts honestly partway through
+  // the chart instead of drawing a warm-up from a single point.
+  const rollingMargin = useMemo(() => {
+    return dailyMarginPoints.map((p) => {
+      const avg = rollingAvg(dailyMarginPoints, p.date, rollingWindow)
+      if (avg == null) return null
+      return Math.round(avg * 10) / 10
+    })
+  }, [dailyMarginPoints, rollingWindow])
 
   const stats = useMemo(() => {
     if (data.length === 0) return null
@@ -170,9 +185,12 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-        <PeriodSelector value={period} onChange={setPeriod} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <RollingWindowSelector value={rollingWindow} onChange={setRollingWindow} />
+          <PeriodSelector value={period} onChange={setPeriod} />
+        </div>
       </div>
 
       {stats && (
@@ -189,13 +207,15 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
         </div>
       )}
 
-      {/* Margin chart — net (after salary) when salary is configured,
-          gross otherwise. Honest gaps for days missing cost. */}
-      <Section label={mode === 'net' ? t('margin_daily_net') : t('margin_daily_gross')}>
+      {/* Margin chart — rolling average (7 or 14 days). Net when salary
+          is configured, gross otherwise. The rolling helper skips days
+          without entries (instead of treating them as 0%), so a single
+          missing day no longer drags the line to the floor. */}
+      <Section label={mode === 'net' ? t('margin_rolling_net') : t('margin_rolling_gross')}>
         <LineChart
           labels={chartLabels}
           datasets={[{
-            data: dailyMargin,
+            data: rollingMargin,
             color: COLORS.margin,
             label: mode === 'net' ? t('kpi_net_margin') : t('kpi_gross_margin_excl'),
             fill: true,
@@ -227,10 +247,13 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
             >
               {t('set_salary_prompt')}
             </Link>
+            <p style={{ fontSize: 11, color: 'var(--color-amber-text)', marginTop: 6, lineHeight: 1.5 }}>
+              {t('gross_margin_rolling_note', { window: rollingWindow })}
+            </p>
           </div>
         ) : (
           <p style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 6, lineHeight: 1.5 }}>
-            {t('net_margin_note')}
+            {t('net_margin_rolling_note', { window: rollingWindow })}
           </p>
         )}
       </Section>
@@ -347,6 +370,48 @@ interface LegendItem {
   label: string
   axisHint?: string
   dashed?: boolean
+}
+
+function RollingWindowSelector({
+  value,
+  onChange,
+}: {
+  value: 7 | 14
+  onChange: (v: 7 | 14) => void
+}) {
+  const t = useTranslations('trends')
+  return (
+    <div
+      className="inline-flex items-center"
+      aria-label={t('rolling_label')}
+      style={{
+        background: 'var(--color-bg-surface)',
+        borderRadius: 'var(--radius-pill)',
+        padding: 2,
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      {([7, 14] as const).map((w) => (
+        <button
+          key={w}
+          onClick={() => onChange(w)}
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            fontWeight: value === w ? 500 : 400,
+            color: value === w ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+            background: value === w ? 'var(--color-bg-active)' : 'transparent',
+            borderRadius: 'var(--radius-pill)',
+            padding: '4px 12px',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          {w === 7 ? t('rolling_7d') : t('rolling_14d')}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function ChartLegend({ items }: { items: LegendItem[] }) {

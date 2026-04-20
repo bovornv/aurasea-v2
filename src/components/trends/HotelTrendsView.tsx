@@ -13,6 +13,7 @@ import { PlanGate } from '@/components/ui/PlanGate'
 import { formatChartDate, formatBaht, formatPct, groupByWeek, formatWeekRange } from '@/lib/formatters'
 import { calculateDailySalaryCost, calculateLabourPct } from '@/lib/calculations/hotel'
 import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
+import { ChartLegend } from '@/components/charts/ChartLegend'
 
 export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: number }) {
   const [period, setPeriod] = useState<30 | 90>(30)
@@ -129,7 +130,15 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
           targetLabel={`${t('target_line')} ${formatBaht(adrTarget)}`}
           yFormatter={(v) => formatBaht(v)}
         />
-        <ChartLegend items={[{ color: '#1D9E75', label: t('above_target') }, { color: '#534AB7', label: t('below_target') }, { color: 'rgba(0,0,0,0.2)', label: `${t('target_line')} ${formatBaht(adrTarget)}`, dashed: true }]} />
+        <ChartLegend
+          marginTop={8}
+          marginBottom={0}
+          items={[
+            { color: '#1D9E75', label: t('above_target'), shape: 'bar' },
+            { color: '#534AB7', label: t('below_target'), shape: 'bar' },
+            { color: 'rgba(0,0,0,0.2)', label: `${t('target_line')} ${formatBaht(adrTarget)}`, dashed: true },
+          ]}
+        />
       </ChartSection>
 
       {/* Occupancy Daily */}
@@ -219,19 +228,6 @@ function ChartSection({ label, children }: { label: string; children: React.Reac
     <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
       <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 12 }}>{label}</p>
       {children}
-    </div>
-  )
-}
-
-function ChartLegend({ items }: { items: { color: string; label: string; dashed?: boolean }[] }) {
-  return (
-    <div className="flex items-center gap-4 flex-wrap" style={{ marginTop: 8 }}>
-      {items.map((item, i) => (
-        <div key={i} className="flex items-center gap-1">
-          <span style={{ width: 10, height: 10, borderRadius: 2, background: item.dashed ? 'transparent' : item.color, border: item.dashed ? `1px dashed ${item.color}` : 'none' }} />
-          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>{item.label}</span>
-        </div>
-      ))}
     </div>
   )
 }

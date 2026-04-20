@@ -20,6 +20,7 @@ import { rolling7DayAvg, rollingAvg } from '@/lib/calculations/rolling'
 import { periodAvgMargin, type MarginInputRow } from '@/lib/calculations/marginAggregates'
 import { toBangkokDateStr } from '@/lib/businessDate'
 import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
+import { ChartLegend } from '@/components/charts/ChartLegend'
 import Link from 'next/link'
 
 // Shared palette so the HTML legend swatches track the Chart.js line
@@ -381,13 +382,6 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-interface LegendItem {
-  color: string
-  label: string
-  axisHint?: string
-  dashed?: boolean
-}
-
 function RollingWindowSelector({
   value,
   onChange,
@@ -430,26 +424,3 @@ function RollingWindowSelector({
   )
 }
 
-function ChartLegend({ items }: { items: LegendItem[] }) {
-  return (
-    <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 10, fontSize: 12 }}>
-      {items.map((item) => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              width: 24,
-              height: 0,
-              flexShrink: 0,
-              borderTop: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.color}`,
-              borderRadius: 1,
-            }}
-          />
-          <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
-          {item.axisHint && (
-            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>({item.axisHint})</span>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}

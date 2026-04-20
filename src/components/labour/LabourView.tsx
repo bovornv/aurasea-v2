@@ -11,6 +11,7 @@ import { formatBaht, formatPct, formatChartDate, groupByWeek, formatWeekRange } 
 import { calculateDailySalaryCost, calculateMinRevenueForLabourTarget, calculateMinRoomsForLabourTarget } from '@/lib/calculations/hotel'
 import { calculateMinCoversForLabourTarget } from '@/lib/calculations/fnb'
 import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
+import { ChartLegend } from '@/components/charts/ChartLegend'
 import Link from 'next/link'
 
 interface Props {
@@ -239,41 +240,3 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   )
 }
 
-interface LegendItem {
-  color: string
-  label: string
-  axisHint?: string
-  dashed?: boolean
-}
-
-function ChartLegend({ items }: { items: LegendItem[] }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 14,
-        flexWrap: 'wrap',
-        marginBottom: 10,
-        fontSize: 12,
-      }}
-    >
-      {items.map((item) => (
-        <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span
-            style={{
-              width: 24,
-              height: 0,
-              flexShrink: 0,
-              borderTop: `2px ${item.dashed ? 'dashed' : 'solid'} ${item.color}`,
-              borderRadius: 1,
-            }}
-          />
-          <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
-          {item.axisHint && (
-            <span style={{ color: 'var(--color-text-tertiary)', fontSize: 11 }}>({item.axisHint})</span>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}

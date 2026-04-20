@@ -21,8 +21,11 @@ export function DailyCostBreakdown({ data, monthlySalary, operatingDays }: Props
 
     const latest = data[data.length - 1]
     const dailySalaryCost = calculateDailySalaryCost(monthlySalary, operatingDays)
+    // Raw daily variable-cost total (additional_cost_today), not the
+    // view's per-cover `avg_cost` average — the latter would drastically
+    // under-report what a day's ingredients actually cost.
     const variableCost = rolling7DayAvg(
-      data.map((d) => ({ date: d.metric_date, value: d.avg_cost })),
+      data.map((d) => ({ date: d.metric_date, value: d.additional_cost_today })),
       latest.metric_date
     )
     const totalCost = dailySalaryCost + variableCost

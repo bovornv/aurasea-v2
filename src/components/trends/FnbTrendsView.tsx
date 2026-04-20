@@ -17,6 +17,8 @@ import {
   calculateGrossMarginStrict,
 } from '@/lib/calculations/fnb'
 import { rolling7DayAvg, rollingAvg } from '@/lib/calculations/rolling'
+import { periodAvgMargin, type MarginInputRow } from '@/lib/calculations/marginAggregates'
+import { toBangkokDateStr } from '@/lib/businessDate'
 import Link from 'next/link'
 
 // Shared palette so the HTML legend swatches track the Chart.js line
@@ -57,17 +59,27 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
   // view (KPI, chart, weekly table, target line) switches to net.
   const mode: MarginMode = monthlySalary > 0 && operatingDays > 0 ? 'net' : 'gross'
 
+  // Normalise metric_date to Bangkok YYYY-MM-DD once. The view returns
+  // metric_date as a UTC timestamp for date-typed columns ("…T17:00:00+00:00"
+  // = midnight Bangkok the next day), which broke `rollingAvg`'s pure-string
+  // date arithmetic — every filter returned zero entries and the margin
+  // rolling chart came back empty. Everything below works off `rows`.
+  const rows = useMemo(
+    () => data.map((d) => ({ ...d, metric_date: toBangkokDateStr(d.metric_date) })),
+    [data],
+  )
+
   // Per-day margin points (net or gross). null for days missing cost —
   // these feed the rolling average and are *excluded* from the window
   // sum (not zero-filled), so one blank day doesn't drag the line down.
   const dailyMarginPoints = useMemo(
-    () => data.map((d) => ({
+    () => rows.map((d) => ({
       date: d.metric_date,
       value: mode === 'net'
         ? calculateNetMargin(d.revenue, d.additional_cost_today, monthlySalary, operatingDays)
         : calculateGrossMarginStrict(d.revenue, d.additional_cost_today),
     })),
-    [data, mode, monthlySalary, operatingDays],
+    [rows, mode, monthlySalary, operatingDays],
   )
 
   // Rolling-average margin series (default 7 days, toggleable to 14).
@@ -83,27 +95,22 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
   }, [dailyMarginPoints, rollingWindow])
 
   const stats = useMemo(() => {
-    if (data.length === 0) return null
-    const covers = data.filter((d) => d.customers != null).map((d) => d.customers!)
-    const spends = data.filter((d) => d.avg_ticket != null).map((d) => d.avg_ticket!)
+    if (rows.length === 0) return null
+    const covers = rows.filter((d) => d.customers != null).map((d) => d.customers!)
+    const spends = rows.filter((d) => d.avg_ticket != null).map((d) => d.avg_ticket!)
     const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
 
-    // Aggregate totals rather than averaging daily margins — days with
-    // missing cost are excluded so their null-value doesn't warp the avg.
-    const withCost = data.filter((d) => (d.additional_cost_today || 0) > 0 && (d.revenue || 0) > 0)
-    const totalRevenue = withCost.reduce((s, d) => s + d.revenue, 0)
-    const totalCost = withCost.reduce((s, d) => s + (d.additional_cost_today || 0), 0)
-    let avgMargin: number | null = null
-    if (totalRevenue > 0) {
-      if (mode === 'net' && monthlySalary > 0 && operatingDays > 0) {
-        const totalSalary = dailySalaryCost * withCost.length
-        avgMargin = Math.round(((totalRevenue - totalCost - totalSalary) / totalRevenue) * 100 * 10) / 10
-      } else if (totalCost > 0) {
-        avgMargin = Math.round((1 - totalCost / totalRevenue) * 100 * 10) / 10
-      }
-    }
+    // Aggregate through the shared selector so this tile exactly matches
+    // the Home "30-day avg" secondary line for the same period.
+    const marginInputs: MarginInputRow[] = rows.map((d) => ({
+      metric_date: d.metric_date,
+      revenue: d.revenue,
+      variableCost: d.additional_cost_today,
+    }))
+    const agg = periodAvgMargin(marginInputs, monthlySalary, operatingDays)
+    const avgMargin: number | null = agg ? agg.value : null
 
-    const avgRevenue = data.reduce((s, d) => s + (d.revenue || 0), 0) / data.length
+    const avgRevenue = rows.reduce((s, d) => s + (d.revenue || 0), 0) / rows.length
     const avgLabour = avgRevenue > 0 && monthlySalary > 0 ? (dailySalaryCost / avgRevenue) * 100 : null
     // Net margin target = gross margin target minus the property's
     // payroll share of average revenue. When gross, target stays as the
@@ -112,14 +119,14 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
       ? Math.max(0, grossMarginTarget - (dailySalaryCost / avgRevenue) * 100)
       : grossMarginTarget
     return { avgMargin, avgCovers: avg(covers), avgSpend: avg(spends), avgLabour, marginTarget }
-  }, [data, mode, monthlySalary, operatingDays, dailySalaryCost, grossMarginTarget])
+  }, [rows, mode, monthlySalary, operatingDays, dailySalaryCost, grossMarginTarget])
 
   const marginTarget = stats?.marginTarget ?? grossMarginTarget
 
   // Weekly aggregate margin (net or gross). Excludes days missing cost
   // from the sum so one blank day doesn't make a week look 100%.
   const weeks = useMemo(() => {
-    return groupByWeek(data).slice(-4).map((week) => {
+    return groupByWeek(rows).slice(-4).map((week) => {
       const withCost = week.filter((d) => (d.additional_cost_today || 0) > 0 && (d.revenue || 0) > 0)
       const weekRevenue = withCost.reduce((s, d) => s + d.revenue, 0)
       const weekCost = withCost.reduce((s, d) => s + (d.additional_cost_today || 0), 0)
@@ -146,22 +153,27 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
         avgSpend: avg(spends),
       }
     })
-  }, [data, mode, monthlySalary, operatingDays, dailySalaryCost])
+  }, [rows, mode, monthlySalary, operatingDays, dailySalaryCost])
 
   const hasMissingWeek = weeks.some((w) => w.daysMissingCost > 0)
 
+  // Raw daily variable-cost total (additional_cost_today). We were
+  // mistakenly plotting `avg_cost`, the per-cover average computed by
+  // the view — that's why the dashed "actual cost" line sat at ~฿100-200
+  // instead of the ฿1,000+ daily totals users actually enter.
   const rollingCosts = useMemo(() => {
-    return data.map((d) => ({
-      raw: d.avg_cost || 0,
-      rolling: rolling7DayAvg(
-        data.map((m) => ({ date: m.metric_date, value: m.avg_cost })),
-        d.metric_date,
-      ),
+    const costEntries = rows.map((m) => ({
+      date: m.metric_date,
+      value: m.additional_cost_today,
     }))
-  }, [data])
+    return rows.map((d) => ({
+      raw: d.additional_cost_today || 0,
+      rolling: rolling7DayAvg(costEntries, d.metric_date),
+    }))
+  }, [rows])
 
   const insight = useMemo(() => {
-    if (!stats || data.length < 7 || stats.avgMargin == null) return null
+    if (!stats || rows.length < 7 || stats.avgMargin == null) return null
     const marginBelow = stats.avgMargin < marginTarget
     const coversBelow = stats.avgCovers < coversTarget
     if (marginBelow && coversBelow) return t('insight_fnb_both_below')
@@ -171,7 +183,7 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
       current: formatBaht(stats.avgSpend),
       target: formatBaht(avgSpendTarget),
     })
-  }, [stats, marginTarget, coversTarget, avgSpendTarget, data.length, t])
+  }, [stats, marginTarget, coversTarget, avgSpendTarget, rows.length, t])
 
   function getStatus(v: number, target: number): 'green' | 'amber' | 'red' | 'neutral' {
     if (v >= target) return 'green'
@@ -181,7 +193,7 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
 
   if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{tCommon('loading')}</div>
 
-  const chartLabels = data.map((d) => formatChartDate(d.metric_date))
+  const chartLabels = rows.map((d) => formatChartDate(d.metric_date))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -262,8 +274,8 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
       <Section label={t('covers_daily')}>
         <BarChart
           labels={chartLabels}
-          data={data.map((d) => d.customers || 0)}
-          colors={data.map((d) => (d.customers || 0) >= coversTarget ? '#1D9E75' : '#534AB7')}
+          data={rows.map((d) => d.customers || 0)}
+          colors={rows.map((d) => (d.customers || 0) >= coversTarget ? '#1D9E75' : '#534AB7')}
           targetValue={coversTarget}
           yFormatter={(v) => `${Math.round(v)} ${t('covers_unit')}`}
         />
@@ -280,8 +292,8 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
         <LineChart
           labels={chartLabels}
           datasets={[
-            { data: data.map((d) => d.revenue), color: COLORS.sales, label: t('line_sales') },
-            { data: data.map((d) => d.avg_ticket || 0), color: COLORS.avgSpend, label: t('line_avg_spend'), yAxisID: 'y2' },
+            { data: rows.map((d) => d.revenue), color: COLORS.sales, label: t('line_sales') },
+            { data: rows.map((d) => d.avg_ticket || 0), color: COLORS.avgSpend, label: t('line_avg_spend'), yAxisID: 'y2' },
           ]}
           yFormatter={(v) => formatBaht(v)}
           y2Formatter={(v) => formatBaht(v)}

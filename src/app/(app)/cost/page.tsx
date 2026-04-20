@@ -46,15 +46,18 @@ function CostContent({ branchId }: { branchId: string }) {
 
   if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
 
-  // Rolling cost data
-  const costEntries = data.map((d) => ({ date: d.metric_date, value: d.avg_cost }))
+  // Rolling cost data — uses the raw daily variable cost total
+  // (additional_cost_today), NOT the view's avg_cost column which is a
+  // per-cover average. Plotting per-cover on a daily-total chart
+  // showed ฿100-200 instead of the ฿1,000+ totals users enter.
+  const costEntries = data.map((d) => ({ date: d.metric_date, value: d.additional_cost_today }))
   const rollingData = data.map((d) => ({
-    raw: d.avg_cost || 0,
+    raw: d.additional_cost_today || 0,
     rolling: rolling7DayAvg(costEntries, d.metric_date),
   }))
 
   // Accuracy
-  const daysWithCost = data.filter((d) => d.avg_cost != null && d.avg_cost > 0).length
+  const daysWithCost = data.filter((d) => d.additional_cost_today != null && d.additional_cost_today > 0).length
 
   // Average revenue for cost target line
   const avgRevenue = data.length > 0 ? data.reduce((s, d) => s + d.revenue, 0) / data.length : 0

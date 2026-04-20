@@ -2,6 +2,13 @@ interface KpiCardProps {
   label: string
   value: string
   subLabel?: string
+  /** Context line rendered directly under the headline value (before target
+   *  and subLabel). Use for "Today" / "Last entry — 19 เม.ย. 2569" hints. */
+  valueContext?: string
+  /** Secondary metric stacked under the headline (e.g. "30-day avg: 17.1%").
+   *  Kept deliberately distinct from `subLabel` so the numeric comparison
+   *  line formats the same way across cards that use this pattern. */
+  secondary?: { label: string; value: string }
   target?: string
   status?: 'green' | 'amber' | 'red' | 'neutral'
   primary?: boolean
@@ -11,6 +18,8 @@ export function KpiCard({
   label,
   value,
   subLabel,
+  valueContext,
+  secondary,
   target,
   status = 'neutral',
   primary = false,
@@ -55,6 +64,31 @@ export function KpiCard({
       >
         {value}
       </p>
+      {valueContext && (
+        <p
+          style={{
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            marginTop: 2,
+            lineHeight: 1.3,
+          }}
+        >
+          {valueContext}
+        </p>
+      )}
+      {secondary && (
+        <p
+          style={{
+            fontSize: 'var(--font-size-xs)',
+            color: 'var(--color-text-secondary)',
+            marginTop: 4,
+            lineHeight: 1.3,
+          }}
+        >
+          <span style={{ color: 'var(--color-text-tertiary)' }}>{secondary.label}:</span>{' '}
+          <span style={{ fontWeight: 500 }}>{secondary.value}</span>
+        </p>
+      )}
       {target && (
         <p
           style={{

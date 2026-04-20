@@ -22,7 +22,9 @@ export function MonthlySummary({ data, monthlySalary }: Props) {
     if (thisMonth.length === 0) return null
 
     const totalRevenue = thisMonth.reduce((s, d) => s + d.revenue, 0)
-    const totalVariableCost = thisMonth.reduce((s, d) => s + (d.avg_cost || 0), 0)
+    // Use the raw daily variable-cost total, not the view's per-cover
+    // average (which, summed, massively under-reports monthly cost).
+    const totalVariableCost = thisMonth.reduce((s, d) => s + (d.additional_cost_today || 0), 0)
     const estimatedTotalCost = totalVariableCost + monthlySalary
     const estimatedProfit = totalRevenue - estimatedTotalCost
     const profitPct = totalRevenue > 0 ? (estimatedProfit / totalRevenue) * 100 : 0

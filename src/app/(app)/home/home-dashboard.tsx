@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
 import { useUser } from '@/providers/user-context'
 import { createClient } from '@/lib/supabase/client'
 import { KpiCard } from '@/components/kpi-card'
@@ -19,6 +19,11 @@ import {
 } from '@/lib/supabase/entry-tables'
 import { getTodayBangkok, toBangkokDateStr } from '@/lib/businessDate'
 import { calculateNetMargin, calculateGrossMarginStrict } from '@/lib/calculations/fnb'
+import {
+  periodAvgMargin,
+  latestCompleteDayMargin,
+  type MarginInputRow,
+} from '@/lib/calculations/marginAggregates'
 import Link from 'next/link'
 import { ArrowRight } from 'lucide-react'
 
@@ -26,6 +31,7 @@ export function HomeDashboard() {
   const { user, role, activeBranch, plan } = useUser()
   const t = useTranslations('home')
   const tCommon = useTranslations('common')
+  const locale = useLocale()
   const [metrics, setMetrics] = useState<UnifiedMetric[]>([])
   const [branchTarget, setBranchTarget] = useState<{
     adr_target: number
@@ -47,14 +53,17 @@ export function HomeDashboard() {
     if (!activeBranch) return
     setLoading(true)
     const todayStr = getTodayBangkok()
-    const todayDate = new Date(todayStr + 'T00:00:00')
-    todayDate.setDate(todayDate.getDate() - 7)
-    const sevenDaysAgoStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`
+    const startDate = new Date(todayStr + 'T00:00:00')
+    // 30-day window so the card's secondary "30-day avg" matches the
+    // Trends tile exactly. The 7-day entry dots still read from the
+    // same set (only the last 7 rows are needed for that panel).
+    startDate.setDate(startDate.getDate() - 30)
+    const thirtyDaysAgoStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`
     const table = getEntryTable(activeBranch.business_type)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const db = supabase as any
     const [metricsResult, targetResult] = await Promise.all([
-      db.from(table).select('*').eq('branch_id', activeBranch.id).gte('metric_date', sevenDaysAgoStr).order('metric_date', { ascending: true }),
+      db.from(table).select('*').eq('branch_id', activeBranch.id).gte('metric_date', thirtyDaysAgoStr).order('metric_date', { ascending: true }),
       db.from('targets')
         .select('adr_target, cogs_target, occupancy_target, labour_target, covers_target, avg_spend_target, operating_days')
         .eq('branch_id', activeBranch.id)
@@ -103,35 +112,55 @@ export function HomeDashboard() {
   // number owners actually care about; gross is a fallback, not equal.
   const operatingDays = branchTarget.operating_days || 26
   const netMarginMode: 'net' | 'gross' = !isHotel && monthlySalary > 0 && operatingDays > 0 ? 'net' : 'gross'
-  // Aggregate margin over the 7-day window (same shape as Trends' tile).
-  // Using the single latest row broke whenever today had revenue+covers
-  // entered but no cost yet — net margin came back null and the card
-  // rendered "-". Aggregating over days-with-cost yields a number as
-  // long as *any* recent day has a complete entry, which matches what
-  // the Trends tab shows for the same venue + period.
-  const marginPct: number | null = (() => {
-    if (isHotel) {
-      return latest
-        ? calculateGrossMarginStrict(latest.revenue, latest.cost)
-        : null
+  // Share two F&B selectors with Trends so the Home secondary "30-day avg"
+  // line and the Trends tile are guaranteed to match for the same window.
+  // See src/lib/calculations/marginAggregates.ts.
+  const marginInputs: MarginInputRow[] = metrics.map((m) => ({
+    metric_date: m.metric_date,
+    revenue: m.revenue,
+    variableCost: m.cost,
+  }))
+  const latestMargin = !isHotel
+    ? latestCompleteDayMargin(marginInputs, monthlySalary, operatingDays)
+    : null
+  const thirtyDayMargin = !isHotel
+    ? periodAvgMargin(marginInputs, monthlySalary, operatingDays)
+    : null
+  // Headline number for the F&B margin card: prefer the most recent complete
+  // day (falls back through the window until it finds one), else the 30-day
+  // aggregate so the card never reads "-" when Trends can show a number.
+  const marginPct: number | null = isHotel
+    ? latest
+      ? calculateGrossMarginStrict(latest.revenue, latest.cost)
+      : null
+    : latestMargin?.value ?? thirtyDayMargin?.value ?? null
+  const marginHeadlineDate = latestMargin?.date ?? null
+  // "Today" when latest-complete-day is today; otherwise "Last entry —
+  // 19 เม.ย. 2569" (th) / "Last entry — 19 Apr 2026" (en). If we fell
+  // back to the 30-day aggregate the context line reads "30-day avg".
+  const marginContext: string | undefined = (() => {
+    if (isHotel) return undefined
+    if (latestMargin) {
+      const todayStr = getTodayBangkok()
+      if (marginHeadlineDate === todayStr) return t('today')
+      if (marginHeadlineDate) {
+        const dateObj = new Date(marginHeadlineDate + 'T00:00:00')
+        const formatted = dateObj.toLocaleDateString(
+          locale === 'th' ? 'th-TH-u-ca-buddhist' : 'en-GB',
+          { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Bangkok' },
+        )
+        return t('lastEntry', { date: formatted })
+      }
     }
-    const withCost = metrics.filter(
-      (m) => (m.revenue || 0) > 0 && (m.cost || 0) > 0,
-    )
-    if (withCost.length === 0) return null
-    const totalRevenue = withCost.reduce((s, m) => s + m.revenue, 0)
-    const totalCost = withCost.reduce((s, m) => s + (m.cost || 0), 0)
-    if (totalRevenue <= 0) return null
-    if (netMarginMode === 'net') {
-      const totalSalary = (monthlySalary / operatingDays) * withCost.length
-      const pct = ((totalRevenue - totalCost - totalSalary) / totalRevenue) * 100
-      if (pct > 80 || pct < -100) return null
-      return Math.round(pct * 10) / 10
-    }
-    const pct = (1 - totalCost / totalRevenue) * 100
-    if (pct > 85 || pct < 0) return null
-    return Math.round(pct * 10) / 10
+    if (thirtyDayMargin) return t('thirtyDayAvg')
+    return undefined
   })()
+  // Secondary comparison line — always the 30-day aggregate (matches Trends
+  // tile). Suppressed when the headline itself IS the 30-day number.
+  const marginSecondary: { label: string; value: string } | undefined =
+    !isHotel && latestMargin && thirtyDayMargin
+      ? { label: t('thirtyDayAvg'), value: formatPercent(thirtyDayMargin.value) }
+      : undefined
   // Net margin target = gross margin target minus the average payroll
   // share of revenue. For display only — no need to recompute weekly.
   const grossMarginTarget = 100 - branchTarget.cogs_target
@@ -277,6 +306,8 @@ export function HomeDashboard() {
                 <KpiCard
                   label={netMarginMode === 'net' ? t('marginAfterSalary') : t('marginExclSalary')}
                   value={marginPct != null ? formatPercent(marginPct) : '-'}
+                  valueContext={marginPct != null ? marginContext : undefined}
+                  secondary={marginSecondary}
                   target={
                     marginPct != null
                       ? marginGapVal < 0
@@ -286,7 +317,7 @@ export function HomeDashboard() {
                   }
                   subLabel={
                     marginPct != null
-                      ? `${tCommon('target')} ${Math.round(managerMarginTarget)}% · ${t('marginSevenDayAvg')}`
+                      ? `${tCommon('target')} ${Math.round(managerMarginTarget)}%`
                       : t('marginNoDataTooltip')
                   }
                   status={marginPct != null ? getStatus(marginPct, managerMarginTarget) : 'neutral'}
@@ -390,12 +421,14 @@ export function HomeDashboard() {
             <KpiCard
               label={netMarginMode === 'net' ? t('marginAfterSalary') : t('marginExclSalary')}
               value={marginPct != null ? formatPercent(marginPct) : '-'}
+              valueContext={marginPct != null ? marginContext : undefined}
+              secondary={marginSecondary}
               target={marginPct != null ? `${tCommon('target')} ${Math.round(marginTarget)}%` : undefined}
               subLabel={
                 marginPct != null
                   ? netMarginMode === 'gross'
-                    ? `${t('setSalaryPrompt')} · ${t('marginSevenDayAvg')}`
-                    : t('marginSevenDayAvg')
+                    ? t('setSalaryPrompt')
+                    : undefined
                   : t('marginNoDataTooltip')
               }
               status={marginPct != null ? getStatus(marginPct, marginTarget) : 'neutral'}

@@ -95,4 +95,28 @@ describe('rollingAvg', () => {
   it('returns null when given an empty array', () => {
     expect(rollingAvg([], '2026-04-20', 7)).toBeNull()
   })
+
+  it('regression — callers must normalise UTC-timestamp dates first', () => {
+    // Issue 2: the branch_daily_metrics view returns metric_date as a
+    // UTC timestamp ("…T17:00:00+00:00" = midnight Bangkok next day).
+    // `rollingAvg` does pure string comparison on YYYY-MM-DD, so passing
+    // timestamps silently produces no window matches and the chart is
+    // empty. The fix lives in the caller (FnbTrendsView normalises via
+    // toBangkokDateStr once); this test documents the contract.
+    const timestampEntries = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-04-${String(13 + i).padStart(2, '0')}T17:00:00+00:00`,
+      value: 25,
+    }))
+    // With timestamp dates: no entry matches the plain-date window → null.
+    expect(
+      rollingAvg(timestampEntries, '2026-04-19T17:00:00+00:00', 7),
+    ).toBeNull()
+
+    // After normalising (what the Trends view now does): 7 in-window → avg.
+    const normalised = timestampEntries.map((e) => ({
+      ...e,
+      date: e.date.substring(0, 10), // same shape as toBangkokDateStr output
+    }))
+    expect(rollingAvg(normalised, '2026-04-19', 7)).toBeCloseTo(25, 6)
+  })
 })

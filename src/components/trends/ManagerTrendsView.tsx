@@ -6,7 +6,7 @@ import { useTargets } from '@/hooks/useTargets'
 import { BarChart } from '@/components/charts/BarChart'
 import { LineChart } from '@/components/charts/LineChart'
 import { formatChartDate, formatPct } from '@/lib/formatters'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 
 export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isHotel: boolean }) {
   const { data, loading } = useBranchMetrics(branchId, 30)
@@ -27,7 +27,7 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-        <DataCompletenessPill branchId={branchId} businessType={isHotel ? 'accommodation' : 'fnb'} />
+        <OperationalCompletenessPill branchId={branchId} businessType={isHotel ? 'accommodation' : 'fnb'} />
       </div>
 
       {isHotel ? (

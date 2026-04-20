@@ -12,7 +12,7 @@ import { PeriodSelector } from '@/components/ui/PeriodSelector'
 import { PlanGate } from '@/components/ui/PlanGate'
 import { formatChartDate, formatBaht, formatPct, groupByWeek, formatWeekRange } from '@/lib/formatters'
 import { calculateDailySalaryCost, calculateLabourPct } from '@/lib/calculations/hotel'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 
 export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: number }) {
   const [period, setPeriod] = useState<30 | 90>(30)
@@ -104,7 +104,7 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
       <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-          <DataCompletenessPill branchId={branchId} businessType="accommodation" />
+          <OperationalCompletenessPill branchId={branchId} businessType="accommodation" />
         </div>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>

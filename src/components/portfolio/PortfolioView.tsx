@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUser } from '@/providers/user-context'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 import { useBranchMetrics, type BranchDailyMetric } from '@/hooks/useBranchMetrics'
 import { useTargets } from '@/hooks/useTargets'
 import { KpiCard } from '@/components/kpi-card'
@@ -222,7 +222,7 @@ export function PortfolioView() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-        <DataCompletenessPill
+        <OperationalCompletenessPill
           branchId={activeBranch?.id}
           businessType={activeBranch?.business_type as 'fnb' | 'accommodation' | undefined}
         />

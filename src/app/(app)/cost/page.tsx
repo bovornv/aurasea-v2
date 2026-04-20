@@ -8,8 +8,7 @@ import { useTargets } from '@/hooks/useTargets'
 import { PlanGate } from '@/components/ui/PlanGate'
 import { PeriodSelector } from '@/components/ui/PeriodSelector'
 import { DailyCostBreakdown } from '@/components/cost/DailyCostBreakdown'
-import { AccuracyIndicator } from '@/components/cost/AccuracyIndicator'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { CostCoverageSection } from '@/components/cost/CostCoverageSection'
 import { MonthlySummary } from '@/components/cost/MonthlySummary'
 import { LineChart } from '@/components/charts/LineChart'
 import { formatChartDate, formatBaht } from '@/lib/formatters'
@@ -64,10 +63,7 @@ function CostContent({ branchId }: { branchId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-          <DataCompletenessPill branchId={branchId} businessType="fnb" />
-        </div>
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
         <PeriodSelector value={period} onChange={setPeriod} />
       </div>
 
@@ -78,10 +74,10 @@ function CostContent({ branchId }: { branchId: string }) {
         operatingDays={operatingDays}
       />
 
-      {/* Data completeness — always visible on Cost because every figure
-          on this tab is an estimate whose precision depends on how many
-          of the last 30 days have complete entries. */}
-      <AccuracyIndicator branchId={branchId} businessType="fnb" />
+      {/* Cost coverage — 60-day coverage ratio honours lumpy purchases
+          (weekly Makro runs etc.). Replaces the old daily-completeness
+          indicator which penalised normal F&B behaviour. */}
+      <CostCoverageSection branchId={branchId} businessType="fnb" />
 
       {/* Cost chart with rolling average */}
       <div style={{ background: 'var(--color-bg)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>

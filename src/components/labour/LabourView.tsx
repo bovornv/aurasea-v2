@@ -10,7 +10,7 @@ import { BarChart } from '@/components/charts/BarChart'
 import { formatBaht, formatPct, formatChartDate, groupByWeek, formatWeekRange } from '@/lib/formatters'
 import { calculateDailySalaryCost, calculateMinRevenueForLabourTarget, calculateMinRoomsForLabourTarget } from '@/lib/calculations/hotel'
 import { calculateMinCoversForLabourTarget } from '@/lib/calculations/fnb'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 import Link from 'next/link'
 
 interface Props {
@@ -102,7 +102,7 @@ export function LabourView({ branchId, isHotel }: Props) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-          <DataCompletenessPill branchId={branchId} businessType={isHotel ? 'accommodation' : 'fnb'} />
+          <OperationalCompletenessPill branchId={branchId} businessType={isHotel ? 'accommodation' : 'fnb'} />
         </div>
         <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '20px 16px', textAlign: 'center' }}>
           <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)', marginBottom: 12 }}>{t('setup_prompt')}</p>

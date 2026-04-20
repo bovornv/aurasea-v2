@@ -10,7 +10,7 @@ import { ScenarioTable } from '@/components/pricing/ScenarioTable'
 import { DemandCalendar } from '@/components/pricing/DemandCalendar'
 import { BarChart } from '@/components/charts/BarChart'
 import { generateScenarios, calculateHistoricalElasticity } from '@/lib/calculations/pricing'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 import { formatChartDate, formatBaht } from '@/lib/formatters'
 
 export default function PricingPage() {
@@ -61,7 +61,7 @@ function PricingContent({ branchId, totalRooms }: { branchId: string; totalRooms
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-        <DataCompletenessPill branchId={branchId} businessType="accommodation" />
+        <OperationalCompletenessPill branchId={branchId} businessType="accommodation" />
       </div>
 
       {/* Context card */}

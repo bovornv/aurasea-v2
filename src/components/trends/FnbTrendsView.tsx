@@ -19,7 +19,7 @@ import {
 import { rolling7DayAvg, rollingAvg } from '@/lib/calculations/rolling'
 import { periodAvgMargin, type MarginInputRow } from '@/lib/calculations/marginAggregates'
 import { toBangkokDateStr } from '@/lib/businessDate'
-import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
+import { OperationalCompletenessPill } from '@/components/ui/OperationalCompletenessPill'
 import Link from 'next/link'
 
 // Shared palette so the HTML legend swatches track the Chart.js line
@@ -201,7 +201,7 @@ export function FnbTrendsView({ branchId }: { branchId: string }) {
       <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
-          <DataCompletenessPill branchId={branchId} businessType="fnb" />
+          <OperationalCompletenessPill branchId={branchId} businessType="fnb" />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <RollingWindowSelector value={rollingWindow} onChange={setRollingWindow} />

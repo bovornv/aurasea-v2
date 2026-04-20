@@ -436,21 +436,33 @@
     "variable_cost": "Variable cost (7-day avg)",
     "total_cost": "Total cost today",
     "profit_after_salary": "Profit after salary (est.)",
-    "accuracy_label": "Data completeness",
-    "fill_cost_daily": "Enter sales, covers and variable cost daily — estimates sharpen as the window fills.",
-    "accuracy_great": "Great — aim for 80%+ so cost estimates stay reliable.",
-    "accuracy_excellent": "Excellent — AuraSea's cost estimates are highly reliable at this level.",
     "rolling_note": "Solid = 7-day avg · Dashed = actual entries",
     "setup_salary_prompt": "Set monthly salary in Settings → Targets to enable cost calculations",
     "monthly_summary_title": "Monthly cost summary"
   },
-  "dataCompleteness": {
+  "operationalCompleteness": {
     "label": "Data completeness",
     "pill_n_of_window": "{days}/30 days",
     "headline": "Data completeness: {pct}%",
     "subtext": "{days} of the last 30 days have complete entries.",
-    "definition": "A day is complete when sales, covers, and variable cost are all entered.",
+    "definition": "A day is complete when sales and covers are both entered. Variable cost is tracked separately on the Cost tab.",
     "cta": "→ Go to Entry to fill missing days"
+  },
+  "costCoverage": {
+    "label": "Cost coverage",
+    "headline": "Cost coverage: {pct}% over last 60 days",
+    "popover_headline": "Cost coverage: {pct}%",
+    "subtext": "{covered} of {operational} operational days are covered by a cost entry within 7 days.",
+    "helper": "Estimates improve as coverage rises. Batch purchases (e.g. weekly Makro runs) are fine — we credit the following 7 days. Closed days are excluded.",
+    "not_enough_data": "Not enough data yet",
+    "not_enough_data_sub": "Enter sales to start tracking cost coverage.",
+    "explanation": "A day counts as \"covered\" if a variable cost entry exists for that day or any of the 7 preceding days. This accounts for batch purchases that are normal in F&B.",
+    "closed_note": "Closed days (no sales) are excluded from both numerator and denominator.",
+    "legend_covered": "Covered",
+    "legend_uncovered": "Uncovered",
+    "legend_closed": "Closed",
+    "legend_entry": "Cost entry",
+    "cta": "→ Go to Entry to add cost data"
   },
   "labour": {
     "title": "Labour Cost",

@@ -4,8 +4,11 @@ import { useState, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
-import { useDataCompleteness } from '@/hooks/useDataCompleteness'
-import type { CompletenessLevel, DataCompleteness } from '@/lib/calculations/dataCompleteness'
+import { useOperationalCompleteness } from '@/hooks/useOperationalCompleteness'
+import type {
+  CompletenessLevel,
+  OperationalCompleteness,
+} from '@/lib/calculations/operationalCompleteness'
 
 const LEVEL_COLORS: Record<CompletenessLevel, string> = {
   green: 'var(--color-positive)',
@@ -19,19 +22,21 @@ interface Props {
 }
 
 /**
- * Page-title pill for data completeness. Two display states:
+ * Page-title pill — Metric A (operational completeness). Tracks whether
+ * sales + covers/rooms are being entered daily. Does NOT consider cost
+ * (see costCoverage.ts for the lumpy-cost-aware metric on the Cost tab).
+ *
+ * Display states:
  *   - daysPresent < 30 → `● N/30 days` with threshold-colored dot
- *   - daysPresent == 30 → compact ⓘ info icon (no text)
- * Both are clickable and open the same detail popover.
+ *   - daysPresent === 30 → compact ⓘ info icon (no "Data complete" text)
+ * Both click-open the same 30-square popover.
  */
-export function DataCompletenessPill({ branchId, businessType }: Props) {
-  const { completeness, loading } = useDataCompleteness(branchId, businessType)
+export function OperationalCompletenessPill({ branchId, businessType }: Props) {
+  const { completeness, loading } = useOperationalCompleteness(branchId, businessType)
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const t = useTranslations('dataCompleteness')
+  const t = useTranslations('operationalCompleteness')
 
-  // Close on outside click / Escape. Runs only while the popover is open
-  // so we don't leak listeners on every page render.
   useEffect(() => {
     if (!open) return
     function handleClickOutside(e: MouseEvent) {
@@ -115,10 +120,10 @@ function Popover({
   completeness,
   onClose,
 }: {
-  completeness: DataCompleteness
+  completeness: OperationalCompleteness
   onClose: () => void
 }) {
-  const t = useTranslations('dataCompleteness')
+  const t = useTranslations('operationalCompleteness')
   const color = LEVEL_COLORS[completeness.level]
   return (
     <div

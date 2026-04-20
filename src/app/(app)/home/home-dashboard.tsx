@@ -10,6 +10,7 @@ import { RecommendationCard } from '@/components/recommendation-card'
 import { EntryStatusPanel } from '@/components/entry-status-panel'
 import { PullToRefresh } from '@/components/pull-to-refresh'
 import { StaleBadge } from '@/components/stale-badge'
+import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
 import { formatCurrency, formatPercent } from '@/lib/format'
 import {
   getEntryTable,
@@ -242,7 +243,13 @@ export function HomeDashboard() {
     return (
       <PullToRefresh onRefresh={handleRefresh}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <StaleBadge lastFetchedAt={lastFetched} />
+          <div className="flex items-center justify-between">
+            <DataCompletenessPill
+              branchId={activeBranch.id}
+              businessType={activeBranch.business_type as 'fnb' | 'accommodation'}
+            />
+            <StaleBadge lastFetchedAt={lastFetched} />
+          </div>
 
           {/* Operational recommendation card */}
           <div
@@ -390,7 +397,13 @@ export function HomeDashboard() {
               </p>
             )}
           </div>
-          <StaleBadge lastFetchedAt={lastFetched} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DataCompletenessPill
+              branchId={activeBranch.id}
+              businessType={activeBranch.business_type as 'fnb' | 'accommodation'}
+            />
+            <StaleBadge lastFetchedAt={lastFetched} />
+          </div>
         </div>
 
         {/* Recommendation — left accent border */}

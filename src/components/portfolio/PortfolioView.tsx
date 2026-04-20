@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { useUser } from '@/providers/user-context'
+import { DataCompletenessPill } from '@/components/ui/DataCompletenessPill'
 import { useBranchMetrics, type BranchDailyMetric } from '@/hooks/useBranchMetrics'
 import { useTargets } from '@/hooks/useTargets'
 import { KpiCard } from '@/components/kpi-card'
@@ -105,7 +106,7 @@ function useBranchData(branch: Branch) {
 }
 
 export function PortfolioView() {
-  const { branches } = useUser()
+  const { branches, activeBranch } = useUser()
   const t = useTranslations('portfolio')
 
   // Fetch data for each branch (max 3 for Pro)
@@ -219,7 +220,13 @@ export function PortfolioView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('title')}</h2>
+        <DataCompletenessPill
+          branchId={activeBranch?.id}
+          businessType={activeBranch?.business_type as 'fnb' | 'accommodation' | undefined}
+        />
+      </div>
 
       {/* KPI summary row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>

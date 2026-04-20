@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react'
 import Chart from 'chart.js/auto'
 
 interface DatasetConfig {
-  data: number[]
+  data: (number | null)[]
   color: string
   label: string
   dashed?: boolean
@@ -21,6 +21,9 @@ interface LineChartProps {
   y2Formatter?: (v: number) => string
   targetValue?: number
   targetLabel?: string
+  yMin?: number
+  yMax?: number
+  spanGaps?: boolean
 }
 
 export function LineChart({
@@ -31,6 +34,9 @@ export function LineChart({
   y2Formatter,
   targetValue,
   targetLabel,
+  yMin,
+  yMax,
+  spanGaps = true,
 }: LineChartProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const chartRef = useRef<Chart | null>(null)
@@ -52,6 +58,7 @@ export function LineChart({
       pointRadius: 0,
       tension: 0.3,
       yAxisID: ds.yAxisID || 'y',
+      spanGaps,
     }))
 
     if (targetValue !== undefined) {
@@ -61,6 +68,7 @@ export function LineChart({
         backgroundColor: 'transparent',
         fill: false,
         label: targetLabel || 'Target',
+        spanGaps,
         borderWidth: 1,
         borderDash: [4, 3],
         pointRadius: 0,
@@ -71,7 +79,13 @@ export function LineChart({
 
     const scales: Record<string, object> = {
       x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9b9b9b', maxTicksLimit: 8, autoSkip: true } },
-      y: { position: 'left', grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, color: '#9b9b9b', callback: (v: string | number) => yFormatter(Number(v)) } },
+      y: {
+        position: 'left',
+        grid: { color: 'rgba(0,0,0,0.05)' },
+        ticks: { font: { size: 11 }, color: '#9b9b9b', callback: (v: string | number) => yFormatter(Number(v)) },
+        ...(yMin !== undefined ? { min: yMin } : {}),
+        ...(yMax !== undefined ? { max: yMax } : {}),
+      },
     }
 
     if (hasY2 && y2Formatter) {
@@ -94,7 +108,7 @@ export function LineChart({
     })
 
     return () => { chartRef.current?.destroy() }
-  }, [labels, datasets, height, yFormatter, y2Formatter, targetValue, targetLabel])
+  }, [labels, datasets, height, yFormatter, y2Formatter, targetValue, targetLabel, yMin, yMax, spanGaps])
 
   return (
     <div style={{ position: 'relative', height, minHeight: 140 }}>

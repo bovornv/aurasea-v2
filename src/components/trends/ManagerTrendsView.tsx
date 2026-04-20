@@ -11,10 +11,11 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
   const { data, loading } = useBranchMetrics(branchId, 30)
   const { targets } = useTargets(branchId)
   const t = useTranslations('trends')
+  const tCommon = useTranslations('common')
 
   const last7 = data.slice(-7)
 
-  if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+  if (loading) return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{tCommon('loading')}</div>
 
   const chartLabels = last7.map((d) => formatChartDate(d.metric_date))
   const occTarget = Number(targets?.occupancy_target ?? targets?.occ_target) || 80
@@ -27,7 +28,7 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
 
       {isHotel ? (
         <>
-          <Section label="Occupancy 7 วัน">
+          <Section label={t('manager_occ_7')}>
             <BarChart
               labels={chartLabels}
               data={last7.map((d) => d.occupancy_rate || 0)}
@@ -40,7 +41,7 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
         </>
       ) : (
         <>
-          <Section label="Margin 7 วัน">
+          <Section label={t('manager_margin_7')}>
             <LineChart
               labels={chartLabels}
               datasets={[{ data: last7.map((d) => d.margin || 0), color: '#1D9E75', label: 'Margin %' }]}
@@ -49,7 +50,7 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
               height={140}
             />
           </Section>
-          <Section label="Covers 7 วัน">
+          <Section label={t('manager_covers_7')}>
             <BarChart
               labels={chartLabels}
               data={last7.map((d) => d.customers || 0)}
@@ -65,7 +66,7 @@ export function ManagerTrendsView({ branchId, isHotel }: { branchId: string; isH
       {/* Note */}
       <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: '12px 14px' }}>
         <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-tertiary)' }}>
-          ดูแนวโน้มย้อนหลัง 7 วัน — ข้อมูล 30/90 วันเห็นได้เฉพาะ Owner
+          {t('manager_hint')}
         </p>
       </div>
     </div>

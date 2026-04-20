@@ -19,6 +19,7 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
   const { targets } = useTargets(branchId)
   const { plan } = useUser()
   const t = useTranslations('trends')
+  const tCommon = useTranslations('common')
 
   const adrTarget = Number(targets?.adr_target) || 0
   const occTarget = Number(targets?.occupancy_target ?? targets?.occ_target) || 80
@@ -70,19 +71,19 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
     const occBelow = stats.avgOcc < occTarget
 
     if (adrGap >= 0 && occBelow) {
-      return `ADR เฉลี่ย ${period} วันสูงกว่าเป้า ${formatBaht(adrGap)} — แต่ Occupancy ยังต่ำกว่าเป้า พิจารณาแพ็กเกจรายสัปดาห์หรือราคา walk-in พิเศษ`
+      return t('insight_hotel_adr_high_occ_low', { period, gap: formatBaht(adrGap) })
     }
     if (adrGap < 0 && !occBelow) {
-      return `Occupancy ใกล้เป้า ${formatPct(stats.avgOcc)}— แต่ ADR ยังต่ำกว่าเป้า ${formatBaht(Math.abs(adrGap))} ลองปรับราคาขึ้นในช่วงที่ demand สูง`
+      return t('insight_hotel_occ_ok_adr_low', { occ: formatPct(stats.avgOcc), gap: formatBaht(Math.abs(adrGap)) })
     }
     if (adrGap < 0 && occBelow) {
-      return `ทั้ง ADR และ Occupancy ต่ำกว่าเป้า — ดูตาราง 'ปรับราคา' เพื่อหา ADR ที่ดีที่สุดสำหรับจำนวนห้องว่างที่มี`
+      return t('insight_hotel_both_below')
     }
     if (last7Avg > prev7Avg) {
-      return `ADR และ Occupancy ตามเป้าทั้งคู่ใน ${period} วันที่ผ่านมา — ดู Labour cost และ Channel mix เพื่อหาโอกาสเพิ่ม margin`
+      return t('insight_hotel_on_track', { period })
     }
     return `ADR trend: ${last7Avg > prev7Avg ? '↑' : '↓'} — Occupancy ${formatPct(stats.avgOcc)}`
-  }, [data, stats, adrTarget, occTarget, period])
+  }, [data, stats, adrTarget, occTarget, period, t])
 
   function getStatus(v: number, target: number): 'green' | 'amber' | 'red' | 'neutral' {
     if (v >= target) return 'green'
@@ -91,7 +92,7 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
   }
 
   if (loading) {
-    return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>Loading...</div>
+    return <div style={{ padding: 'var(--space-10) 0', textAlign: 'center', color: 'var(--color-text-tertiary)' }}>{tCommon('loading')}</div>
   }
 
   const chartLabels = data.map((d) => formatChartDate(d.metric_date))
@@ -110,7 +111,7 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
           <KpiCard label="ADR" value={formatBaht(stats.avgAdr)} target={adrTarget ? `${formatBaht(adrTarget)}` : undefined} status={getStatus(stats.avgAdr, adrTarget)} />
           <KpiCard label="Occupancy" value={formatPct(stats.avgOcc)} target={`${formatPct(occTarget, 0)}`} status={getStatus(stats.avgOcc, occTarget)} />
           <KpiCard label="RevPAR" value={formatBaht(stats.avgRevpar)} status="neutral" />
-          <KpiCard label="Labour %" value={stats.avgLabour != null && monthlySalary > 0 ? formatPct(stats.avgLabour) : 'ยังไม่ได้ตั้งค่า'} target={monthlySalary > 0 ? formatPct(labourTarget, 0) : undefined} status={stats.avgLabour != null && monthlySalary > 0 ? getStatus(labourTarget, stats.avgLabour) : 'neutral'} />
+          <KpiCard label={t('kpi_labour')} value={stats.avgLabour != null && monthlySalary > 0 ? formatPct(stats.avgLabour) : t('not_configured')} target={monthlySalary > 0 ? formatPct(labourTarget, 0) : undefined} status={stats.avgLabour != null && monthlySalary > 0 ? getStatus(labourTarget, stats.avgLabour) : 'neutral'} />
         </div>
       )}
 
@@ -168,7 +169,7 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
             />
           </ChartSection>
         ) : (
-          <InfoCard text="ตั้งค่าเงินเดือนรายเดือนใน Settings → Targets เพื่อดู Labour cost" />
+          <InfoCard text={t('salary_setup_hint')} />
         )}
       </PlanGate>
 
@@ -178,10 +179,10 @@ export function HotelTrendsView({ branchId }: { branchId: string; totalRooms?: n
           <table style={{ width: '100%', fontSize: 'var(--font-size-sm)', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>สัปดาห์</th>
-                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>ADR</th>
-                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>% ของเป้า</th>
-                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>Occ.</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{t('week_col')}</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{t('adr_col')}</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{t('pct_target_col')}</th>
+                <th style={{ textAlign: 'right', padding: '6px 8px', fontWeight: 500, color: 'var(--color-text-tertiary)' }}>{t('occ_col')}</th>
               </tr>
             </thead>
             <tbody>
